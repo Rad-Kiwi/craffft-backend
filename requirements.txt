@@ -1,4 +1,4 @@
-Flask
 requests
+Flask
 airtable-python-wrapper
 python-dotenv
