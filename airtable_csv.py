@@ -2,6 +2,7 @@ import os
 from airtable import Airtable
 import csv
 import io
+import json
 
 class AirtableCSVExporter:
     def __init__(self, base_id, table_name, api_key):
@@ -44,4 +45,23 @@ class AirtableCSVExporter:
         records = airtable.get_all()
         if not records:
             return None
-        return [record['fields'] for record in records]
+        result = []
+
+        # Below is code to move the images from their own fields to a single 'images' field
+        # This is useful for simplifying the JSON structure and making it easier to handle in the frontend
+        for record in records:
+            fields = record['fields'].copy()
+            
+            images = []
+            keys_to_remove = []
+            for k in list(fields.keys()):
+                if k.startswith('images/') or k.startswith('imageUrls/'):
+                    if fields[k]:
+                        images.append(fields[k])
+                    keys_to_remove.append(k)
+            for k in keys_to_remove:
+                del fields[k]
+            if images:
+                fields['images'] = images
+            result.append(fields)
+        return result

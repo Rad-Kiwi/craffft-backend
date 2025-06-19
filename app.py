@@ -8,6 +8,7 @@ from scheduler import DailyAirtableUpdater
 app = Flask(__name__)
 
 
+
 load_dotenv('.env.local')
 
 # Ensure required environment variables are set
@@ -15,6 +16,8 @@ if not os.getenv('AIRTABLE_BASE_ID') or not os.getenv('AIRTABLE_TABLE_NAME') or 
     load_dotenv('.env')
 if not os.getenv('AIRTABLE_BASE_ID') or not os.getenv('AIRTABLE_TABLE_NAME') or not os.getenv('AIRTABLE_API_KEY'):
     raise ValueError("Missing required environment variables: AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME, AIRTABLE_API_KEY")
+
+ENVIRONMENT_MODE = os.getenv('ENVIRONMENT', 'Production')
 
 exporter = AirtableCSVExporter(
     base_id=os.getenv('AIRTABLE_BASE_ID'),
@@ -50,8 +53,9 @@ def get_tile_data():
     return jsonify(json_data)
 
 if __name__ == '__main__':
-    exporter.fetch_csv()  # Initial fetch to ensure data is available
-    exporter.save_csv()  # Save initial CSV
+    if ENVIRONMENT_MODE == 'Production':
+        exporter.fetch_csv()  # Initial fetch to ensure data is available
+        exporter.save_csv()  # Save initial CSV
 
     # Start the scheduler in a background thread
     def start_scheduler():
