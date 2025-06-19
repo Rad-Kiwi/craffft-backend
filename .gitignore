@@ -12,7 +12,6 @@ env/
 .idea/
 
 # Environment variables
-.env
 .env.local
 
 # Data files
