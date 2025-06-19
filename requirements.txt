@@ -4,3 +4,4 @@ airtable-python-wrapper
 python-dotenv
 gunicorn
 schedule
+flask_cors
