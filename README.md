@@ -1,4 +1,12 @@
 # kelp-helpers-backend
+This is the backend for the kelp helpers website
+
+Its main task currently is to grab data from airtable.
+
+It does this both once on the backend startup, and once daily at midnight.
+
+If there are issues accessing airtable, currently the data is also stored on github as a backup, although this may be removed later if there are too many updates.
+
 
 ## Installation
 
