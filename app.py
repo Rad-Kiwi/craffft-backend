@@ -2,6 +2,8 @@ from flask import Flask, Response, jsonify
 import os
 from dotenv import load_dotenv
 from airtable_csv import AirtableCSVExporter
+import threading
+from scheduler import DailyAirtableUpdater
 
 app = Flask(__name__)
 
@@ -53,4 +55,12 @@ def get_tile_data():
     return jsonify(json_data)
 
 if __name__ == '__main__':
+    # Start the scheduler in a background thread
+    def start_scheduler():
+        updater = DailyAirtableUpdater()
+        updater.run_daily("00:00")  # Set desired time
+
+    scheduler_thread = threading.Thread(target=start_scheduler, daemon=True)
+    scheduler_thread.start()
+
     app.run(debug=True)

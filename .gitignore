@@ -4,8 +4,12 @@ __pycache__/
 *$py.class
 
 # Virtual environment
+.venv/
 venv/
 env/
+
+# Pycharm project files
+.idea/
 
 # Environment variables
 .env
