@@ -32,14 +32,14 @@ def home():
 
 @app.route('/get-airtable-csv', methods=['GET'])
 def get_airtable_csv():
-    csv_data = exporter.fetch_csv()
+    csv_data = exporter.read_csv()
     if not csv_data:
         return Response("No data found", status=404)
     return Response(csv_data, mimetype='text/csv')
 
 @app.route('/update-tile-data')
 def update_tile_data():
-    success = exporter.save_csv()
+    success = exporter.update_csv_from_airtable()
     if success:
         return "CSV saved to /data/coastline-tiles-with-data.csv"
     else:
@@ -47,15 +47,14 @@ def update_tile_data():
 
 @app.route('/get-tile-data', methods=['GET'])
 def get_tile_data():
-    json_data = exporter.fetch_json()
+    json_data = exporter.convert_csv_to_json()
     if not json_data:
         return Response("No data found", status=404)
     return jsonify(json_data)
 
 if __name__ == '__main__':
     if ENVIRONMENT_MODE == 'Production':
-        exporter.fetch_csv()  # Initial fetch to ensure data is available
-        exporter.save_csv()  # Save initial CSV
+        exporter.update_csv_from_airtable()  # Save initial CSV
 
     # Start the scheduler in a background thread
     def start_scheduler():
