@@ -1,0 +1,47 @@
+import os
+from airtable import Airtable
+import csv
+import io
+
+class AirtableCSVExporter:
+    def __init__(self, base_id, table_name, api_key):
+        self.base_id = base_id
+        self.table_name = table_name
+        self.api_key = api_key
+
+    def fetch_csv(self):
+        airtable = Airtable(self.base_id, self.table_name, self.api_key)
+        records = airtable.get_all()
+        if not records:
+            return None
+
+        fieldnames = set()
+        for record in records:
+            fieldnames.update(record['fields'].keys())
+        fieldnames = list(fieldnames)
+
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        for record in records:
+            writer.writerow(record['fields'])
+
+        csv_data = output.getvalue()
+        output.close()
+        return csv_data
+
+    def save_csv(self, path="data/coastline-tiles-with-data.csv"):
+        csv_data = self.fetch_csv()
+        if not csv_data:
+            return False
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline='') as f:
+            f.write(csv_data)
+        return True
+
+    def fetch_json(self):
+        airtable = Airtable(self.base_id, self.table_name, self.api_key)
+        records = airtable.get_all()
+        if not records:
+            return None
+        return [record['fields'] for record in records]
