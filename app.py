@@ -1,6 +1,4 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from flask import Response, jsonify, Flask
+from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
@@ -8,14 +6,8 @@ from airtable_csv import AirtableCSVExporter
 import threading
 from scheduler import DailyAirtableUpdater
 
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = Flask(__name__)
+CORS(app)
 
 load_dotenv('.env.local')
 
@@ -33,15 +25,13 @@ exporter = AirtableCSVExporter(
     api_key=os.getenv('AIRTABLE_API_KEY')
 )
 
-CORS(app)
 
-
-@app.get("/")
+@app.route("/")
 def home():
     return "Hello, Flask!"
 
 
-@app.get("/get-airtable-csv")
+@app.route("/get-airtable-csv", methods=['GET'])
 def get_airtable_csv():
     csv_data = exporter.read_csv()
     if not csv_data:
@@ -49,7 +39,7 @@ def get_airtable_csv():
     return Response(csv_data, mimetype='text/csv')
 
 
-@app.get("/update-tile-data")
+@app.route("/update-tile-data", methods=['GET'])
 def update_tile_data():
     success = exporter.update_csv_from_airtable()
     if success:
@@ -58,7 +48,7 @@ def update_tile_data():
         return "No data found or failed to save", 500
 
 
-@app.get("/get-tile-data")
+@app.route("/get-tile-data", methods=['GET'])
 def get_tile_data():
     json_data = exporter.convert_csv_to_json()
     if not json_data:
