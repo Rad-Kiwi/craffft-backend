@@ -14,7 +14,8 @@ class DailyAirtableUpdater:
 
     def update_csv(self):
         print("Updating Airtable CSV...")
-        success = self.exporter.save_csv()
+        success = self.exporter.update_csv_from_airtable()
+        
         if success:
             print("CSV updated successfully.")
         else:
