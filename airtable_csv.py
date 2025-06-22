@@ -4,7 +4,7 @@ import csv
 import io
 import json
 
-class AirtableCSVExporter:
+class AirtableCSVManager:
     def __init__(self, base_id, table_name, api_key):
         self.base_id = base_id
         self.table_name = table_name

@@ -2,7 +2,7 @@ import os
 import time
 from dotenv import load_dotenv
 import schedule
-from airtable_csv import AirtableCSVExporter
+from airtable_csv import AirtableCSVManager
 
 class DailyAirtableUpdater:
     def __init__(self):
@@ -10,12 +10,12 @@ class DailyAirtableUpdater:
         self.base_id = os.getenv('AIRTABLE_BASE_ID')
         self.table_name = os.getenv('AIRTABLE_TABLE_NAME')
         self.api_key = os.getenv('AIRTABLE_API_KEY')
-        self.exporter = AirtableCSVExporter(self.base_id, self.table_name, self.api_key)
+        self.exporter = AirtableCSVManager(self.base_id, self.table_name, self.api_key)
 
     def update_csv(self):
         print("Updating Airtable CSV...")
         success = self.exporter.update_csv_from_airtable()
-        
+
         if success:
             print("CSV updated successfully.")
         else:

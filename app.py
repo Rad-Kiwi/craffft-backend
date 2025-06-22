@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
-from airtable_csv import AirtableCSVExporter
+from airtable_csv import AirtableCSVManager
 import threading
 from scheduler import DailyAirtableUpdater
 
@@ -19,7 +19,7 @@ if not os.getenv('AIRTABLE_BASE_ID') or not os.getenv('AIRTABLE_TABLE_NAME') or 
 
 ENVIRONMENT_MODE = os.getenv('ENVIRONMENT', 'Production')
 
-exporter = AirtableCSVExporter(
+exporter = AirtableCSVManager(
     base_id=os.getenv('AIRTABLE_BASE_ID'),
     table_name=os.getenv('AIRTABLE_TABLE_NAME'),
     api_key=os.getenv('AIRTABLE_API_KEY')
