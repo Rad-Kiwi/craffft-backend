@@ -5,3 +5,4 @@ python-dotenv
 gunicorn
 schedule
 flask_cors
+stripe
