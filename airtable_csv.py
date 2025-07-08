@@ -9,8 +9,7 @@ class AirtableCSVManager:
         self.base_id = base_id
         self.table_name = table_name
         self.api_key = api_key
-        self.csv_path = "data/coastline-tiles-with-data.csv"
-
+        self.csv_path = f"data/{table_name}.csv"
 
     def read_csv(self):
         # Read and return the raw CSV data from the file
@@ -43,7 +42,7 @@ class AirtableCSVManager:
         with open(self.csv_path, "w", encoding="utf-8") as f:
             f.write(csv_data)
 
-        return "Successfully updated CSV from Airtable. Access it at /data/coastline-tiles-with-data.csv"
+        return f"Successfully updated CSV from Airtable. Access it at /data/{self.table_name}.csv"
 
     def convert_csv_to_json(self):
         # Read the CSV file and convert to JSON, merging images fields
