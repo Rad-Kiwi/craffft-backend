@@ -1,5 +1,8 @@
 # Example usage of AirtableMultiManager
 from airtable_multi_manager import AirtableMultiManager
+from sqlite_storage import SQLiteStorage
+from airtable_csv import AirtableCSVManager
+
 import os
 from dotenv import load_dotenv
 
@@ -152,7 +155,33 @@ def example_update_all_tables():
     
     for table, result in results.items():
         print(f"Update result for {table}: {result}")
-    
+
+def database_example():
+    # Load environment variables
+    load_dotenv('.env.local')
+
+    # Initialize AirtableCSVManager with SQLiteStorage
+    api_key = os.getenv('AIRTABLE_API_KEY')
+    base_id = os.getenv('AIRTABLE_BASE_ID')
+    table_name = "craffft_steps"  # Example table name
+
+    sqlite_store = SQLiteStorage()
+    manager = AirtableCSVManager(base_id, table_name, api_key, sqlite_storage=sqlite_store)
+
+    # Update from Airtable and store in both file and DB
+    manager.update_csv_from_airtable()
+
+    # Read CSV from DB
+    csv_data = manager.read_csv(from_db=True)
+
+    # Read JSON from DB
+    json_data = manager.read_json()
+
+    print(f"CSV data length: {len(csv_data)} characters")
+    print(f"JSON data length: {len(json_data)} records")
+        
+
+
 
 
 if __name__ == "__main__":
@@ -168,8 +197,11 @@ if __name__ == "__main__":
     # print("\n=== Discover Tables ===")
     # example_discover_tables()
 
-    print("\n=== Update All Tables ===")
-    example_update_all_tables()
-    
-    print("\n=== Error Handling ===")
-    example_error_handling()
+    # print("\n=== Update All Tables ===")
+    # example_update_all_tables()
+    #
+    # print("\n=== Error Handling ===")
+    # example_error_handling()
+
+    print("\n=== Database Example ===")
+    database_example()
