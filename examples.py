@@ -177,10 +177,36 @@ def database_example():
 
     print(f"CSV data length: {len(csv_data)} characters")
 
-        
 
+def database_coloumns_example():
+    # Load environment variables
+    load_dotenv('.env.local')
 
+    # Initialize AirtableCSVManager with SQLiteStorage
+    api_key = os.getenv('AIRTABLE_API_KEY')
+    base_id = os.getenv('AIRTABLE_BASE_ID')
+    table_name = "craffft_steps"  # Example table name
 
+    sqlite_store = SQLiteStorage()
+    manager = AirtableCSVManager(base_id, table_name, api_key, sqlite_storage=sqlite_store)
+
+    # Update from Airtable and store in both file and DB
+    manager.update_csv_from_airtable()
+
+    # Read Row from DB
+    row = manager.get_row("name", "Garlic Hunt")
+
+    if row:
+        print(f"Found row: {row}")
+    else:
+        print("Row not found")
+
+    # Read specific value from DB
+    value = manager.get_value_by_row_and_column("name", "Garlic Hunt", "description")
+    if value:
+        print(f"Found value: {value}")
+    else:
+        print("Value not found")
 
 if __name__ == "__main__":
     # print("=== Basic Usage ===")
@@ -201,5 +227,8 @@ if __name__ == "__main__":
     # print("\n=== Error Handling ===")
     # example_error_handling()
 
-    print("\n=== Database Example ===")
-    database_example()
+    # print("\n=== Database Example ===")
+    # database_example()
+
+    print("\n=== Database Columns Example ===")
+    database_coloumns_example()

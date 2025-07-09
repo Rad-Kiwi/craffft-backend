@@ -51,7 +51,7 @@ class AirtableCSVManager:
 
         # Store in SQLite if available
         if self.sqlite_storage:
-            self.sqlite_storage.save_csv(self.table_name, csv_data)
+            self.sqlite_storage.import_csv_rows(self.table_name, csv_data)
 
         return f"Successfully updated CSV from Airtable. Access it at /data/{self.table_name}.csv"
 
@@ -86,3 +86,13 @@ class AirtableCSVManager:
         if self.sqlite_storage:
             self.sqlite_storage.save_json(self.table_name, json.dumps(result))
         return result
+
+    def get_row(self, column: str, value: str):
+        if self.sqlite_storage:
+            return self.sqlite_storage.find_row_by_column(self.table_name, column, value)
+        return None
+
+    def get_value_by_row_and_column(self, row_lookup_column: str, row_lookup_value: str, value_column: str):
+        if self.sqlite_storage:
+            return self.sqlite_storage.find_value_by_row_and_column(self.table_name, row_lookup_column, row_lookup_value, value_column)
+        return None
