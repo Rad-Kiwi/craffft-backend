@@ -6,3 +6,4 @@ gunicorn
 schedule
 flask_cors
 stripe
+sqlalchemy>=2.0

@@ -174,11 +174,9 @@ def database_example():
     # Read CSV from DB
     csv_data = manager.read_csv(from_db=True)
 
-    # Read JSON from DB
-    json_data = manager.read_json()
 
     print(f"CSV data length: {len(csv_data)} characters")
-    print(f"JSON data length: {len(json_data)} records")
+
         
 
 

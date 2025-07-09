@@ -1,64 +1,54 @@
-import sqlite3
 import os
 from typing import Optional
+from datetime import datetime
+from sqlalchemy import create_engine, Column, String, Text, DateTime
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+Base = declarative_base()
+
+class TableData(Base):
+    __tablename__ = 'table_data'
+    table_name = Column(String, primary_key=True)
+    csv_data = Column(Text)
+    json_data = Column(Text)
+    updated_at = Column(DateTime, default=datetime.utcnow)
 
 class SQLiteStorage:
     def __init__(self, db_path: str = "data/airtable_data.db"):
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.db_path = db_path
-        self._init_db()
-
-    def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
-            c = conn.cursor()
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS table_data (
-                    table_name TEXT PRIMARY KEY,
-                    csv_data TEXT,
-                    json_data TEXT,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            conn.commit()
+        self.engine = create_engine(f'sqlite:///{db_path}', echo=False, future=True)
+        Base.metadata.create_all(self.engine)
+        self.Session = sessionmaker(bind=self.engine, future=True)
 
     def save_csv(self, table_name: str, csv_data: str):
-        with sqlite3.connect(self.db_path) as conn:
-            c = conn.cursor()
-            try:
-                c.execute('''
-                    INSERT INTO table_data (table_name, csv_data, updated_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP)
-                ''', (table_name, csv_data))
-            except sqlite3.IntegrityError:
-                c.execute('''
-                    UPDATE table_data SET csv_data=?, updated_at=CURRENT_TIMESTAMP WHERE table_name=?
-                ''', (csv_data, table_name))
-            conn.commit()
+        with self.Session() as session:
+            obj = session.get(TableData, table_name)
+            if obj:
+                obj.csv_data = csv_data
+                obj.updated_at = datetime.utcnow()
+            else:
+                obj = TableData(table_name=table_name, csv_data=csv_data, updated_at=datetime.utcnow())
+                session.add(obj)
+            session.commit()
 
     def save_json(self, table_name: str, json_data: str):
-        with sqlite3.connect(self.db_path) as conn:
-            c = conn.cursor()
-            try:
-                c.execute('''
-                    INSERT INTO table_data (table_name, json_data, updated_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP)
-                ''', (table_name, json_data))
-            except sqlite3.IntegrityError:
-                c.execute('''
-                    UPDATE table_data SET json_data=?, updated_at=CURRENT_TIMESTAMP WHERE table_name=?
-                ''', (json_data, table_name))
-            conn.commit()
+        with self.Session() as session:
+            obj = session.get(TableData, table_name)
+            if obj:
+                obj.json_data = json_data
+                obj.updated_at = datetime.utcnow()
+            else:
+                obj = TableData(table_name=table_name, json_data=json_data, updated_at=datetime.utcnow())
+                session.add(obj)
+            session.commit()
 
     def get_csv(self, table_name: str) -> Optional[str]:
-        with sqlite3.connect(self.db_path) as conn:
-            c = conn.cursor()
-            c.execute('SELECT csv_data FROM table_data WHERE table_name=?', (table_name,))
-            row = c.fetchone()
-            return row[0] if row else None
+        with self.Session() as session:
+            obj = session.get(TableData, table_name)
+            return obj.csv_data if obj else None
 
     def get_json(self, table_name: str) -> Optional[str]:
-        with sqlite3.connect(self.db_path) as conn:
-            c = conn.cursor()
-            c.execute('SELECT json_data FROM table_data WHERE table_name=?', (table_name,))
-            row = c.fetchone()
-            return row[0] if row else None
+        with self.Session() as session:
+            obj = session.get(TableData, table_name)
+            return obj.json_data if obj else None
