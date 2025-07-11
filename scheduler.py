@@ -48,5 +48,6 @@ class DailyAirtableUpdater:
             time.sleep(60)
 
 if __name__ == "__main__":
+    print("Starting Daily Airtable Updater...")
     updater = DailyAirtableUpdater()
     updater.run_daily("00:00")  # Change time as needed (HH:MM, 24-hour format)

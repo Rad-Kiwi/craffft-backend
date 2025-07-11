@@ -87,12 +87,12 @@ class AirtableCSVManager:
             self.sqlite_storage.save_json(self.table_name, json.dumps(result))
         return result
 
-    def get_row(self, column: str, value: str):
+    def get_row(self, column_containing_reference: str, reference_value: str):
         if self.sqlite_storage:
-            return self.sqlite_storage.find_row_by_column(self.table_name, column, value)
+            return self.sqlite_storage.find_row_by_column(self.table_name, column_containing_reference, reference_value)
         return None
 
-    def get_value_by_row_and_column(self, row_lookup_column: str, row_lookup_value: str, value_column: str):
+    def get_value_by_row_and_column(self, column_containing_reference: str, reference_value: str, target_column: str):
         if self.sqlite_storage:
-            return self.sqlite_storage.find_value_by_row_and_column(self.table_name, row_lookup_column, row_lookup_value, value_column)
+            return self.sqlite_storage.find_value_by_row_and_column(self.table_name, column_containing_reference, reference_value, target_column)
         return None

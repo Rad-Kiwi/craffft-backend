@@ -178,7 +178,7 @@ def database_example():
     print(f"CSV data length: {len(csv_data)} characters")
 
 
-def database_coloumns_example():
+def database_columns_example():
     # Load environment variables
     load_dotenv('.env.local')
 
@@ -193,8 +193,13 @@ def database_coloumns_example():
     # Update from Airtable and store in both file and DB
     manager.update_csv_from_airtable()
 
+    # Use the same variable names as in app.py get-value-from-db
+    column_containing_reference = "name"
+    reference_value = "Garlic Hunt"
+    target_column = "description"
+
     # Read Row from DB
-    row = manager.get_row("name", "Garlic Hunt")
+    row = manager.get_row(column_containing_reference, reference_value)
 
     if row:
         print(f"Found row: {row}")
@@ -202,7 +207,30 @@ def database_coloumns_example():
         print("Row not found")
 
     # Read specific value from DB
-    value = manager.get_value_by_row_and_column("name", "Garlic Hunt", "description")
+    value = manager.get_value_by_row_and_column(column_containing_reference, reference_value, target_column)
+    if value:
+        print(f"Found value: {value}")
+    else:
+        print("Value not found")
+
+
+def database_value_retrieval_multi_manager():
+    # Load environment variables
+    load_dotenv('.env.local')
+
+    # Initialize AirtableMultiManager 
+    multi_manager = AirtableMultiManager.from_environment()
+    
+    multi_manager.discover_and_add_tables_from_base()
+
+    # Use the same variable names as in app.py get-value-from-db
+    column_containing_reference = "name"
+    reference_value = "Garlic Hunt"
+    target_column = "description"
+
+    # Read specific value from DB
+    value = multi_manager.get_value("craffft_steps", column_containing_reference, reference_value, target_column)
+    
     if value:
         print(f"Found value: {value}")
     else:
@@ -231,4 +259,7 @@ if __name__ == "__main__":
     # database_example()
 
     print("\n=== Database Columns Example ===")
-    database_coloumns_example()
+    database_columns_example()
+
+    print("\n=== Database Value Retrieval Multi Manager ===")
+    database_value_retrieval_multi_manager()

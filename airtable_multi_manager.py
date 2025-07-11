@@ -2,6 +2,7 @@ import os
 from typing import Dict, Optional, List
 from airtable import Airtable
 from airtable_csv import AirtableCSVManager
+from sqlite_storage import SQLiteStorage  
 
 
 class AirtableMultiManager:
@@ -10,7 +11,7 @@ class AirtableMultiManager:
     Allows easy access to different tables by table name.
     """
     
-    def __init__(self, api_key: str, base_id: str, table_names: Optional[List[str]] = None):
+    def __init__(self, api_key: str, base_id: str, table_names: Optional[List[str]] = None, sqlite_storage: Optional[SQLiteStorage] = None):
         """
         Initialize the multi-manager for a single base.
         
@@ -18,11 +19,13 @@ class AirtableMultiManager:
             api_key: The Airtable API key
             base_id: The Airtable base ID
             table_names: List of table names to manage. If None, will use default tables.
+            sqlite_storage: Optional SQLiteStorage instance to use for all tables.
         """
         self.api_key = api_key
         self.base_id = base_id
         self.managers: Dict[str, AirtableCSVManager] = {}
-        
+        self.sqlite_storage = sqlite_storage or SQLiteStorage()  # Always use a shared storage
+
         # Default table names if none provided
         if table_names is None:
             self.table_names = ["DataHub_Craffft"]  # Default table
@@ -38,7 +41,8 @@ class AirtableMultiManager:
             self.managers[table_name] = AirtableCSVManager(
                 base_id=self.base_id,
                 table_name=table_name,
-                api_key=self.api_key
+                api_key=self.api_key,
+                sqlite_storage=self.sqlite_storage  # Pass shared storage
             )
     
     def add_table(self, table_name: str):
@@ -53,7 +57,8 @@ class AirtableMultiManager:
         self.managers[table_name] = AirtableCSVManager(
             base_id=self.base_id,
             table_name=table_name,
-            api_key=self.api_key
+            api_key=self.api_key,
+            sqlite_storage=self.sqlite_storage  # Pass shared storage
         )
     
     def get_manager(self, table_name: str) -> Optional[AirtableCSVManager]:
@@ -172,8 +177,10 @@ class AirtableMultiManager:
         if not base_id:
             raise ValueError("AIRTABLE_BASE_ID environment variable is required")
         
-        return cls(api_key=api_key, base_id=base_id)
-    
+        # Use a shared SQLiteStorage instance
+        sqlite_storage = SQLiteStorage()
+        return cls(api_key=api_key, base_id=base_id, sqlite_storage=sqlite_storage)
+
     @classmethod
     def from_config_dict(cls, config: Dict[str, str]) -> 'AirtableMultiManager':
         """
@@ -194,7 +201,8 @@ class AirtableMultiManager:
         if not base_id:
             raise ValueError("base_id is required in config")
         
-        return cls(api_key=api_key, base_id=base_id, table_names=table_names)
+        sqlite_storage = SQLiteStorage()
+        return cls(api_key=api_key, base_id=base_id, table_names=table_names, sqlite_storage=sqlite_storage)
     
 
     def get_tables_from_base(self, base_id: str = None) -> Optional[List[str]]:
@@ -258,3 +266,21 @@ class AirtableMultiManager:
         
         return results
 
+    def get_value(self, table_name: str, column_containing_reference: str, reference_value: str, target_column: str):
+        """
+        Retrieve a value from a specific column for the row where column_containing_reference == reference_value
+        in the specified table using the relevant AirtableCSVManager.
+
+        Args:
+            table_name: Name of the table
+            column_containing_reference: Column to look up the row
+            reference_value: Value to match in the lookup column
+            target_column: Column from which to retrieve the value
+
+        Returns:
+            The value if found, otherwise None
+        """
+        manager = self.get_manager(table_name)
+        if manager:
+            return manager.get_value_by_row_and_column(column_containing_reference, reference_value, target_column)
+        return None

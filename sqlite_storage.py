@@ -74,10 +74,10 @@ class SQLiteStorage:
                 row_dict = {col: row.get(col, '') for col in fieldnames}
                 conn.execute(insert_sql, row_dict)
 
-    def find_row_by_column(self, table_name: str, column: str, value: str):
+    def find_row_by_column(self, table_name: str, column_containing_reference: str, reference_value: str):
         with self.engine.connect() as conn:
             result = conn.execute(
-                text(f'SELECT * FROM "{table_name}" WHERE "{column}" = :value'), {"value": value}
+                text(f'SELECT * FROM "{table_name}" WHERE "{column_containing_reference}" = :value'), {"value": reference_value}
             )
             row = result.fetchone()
             if row:
@@ -85,14 +85,14 @@ class SQLiteStorage:
                 return dict(zip(columns, row))
             return None
     
-    def find_value_by_row_and_column(self, table_name: str, row_lookup_column: str, row_lookup_value: str, value_column: str):
+    def find_value_by_row_and_column(self, table_name: str, column_containing_reference: str, reference_value: str, target_column: str):
         """
-        Retrieve a value from a specific column for the row where row_lookup_column == row_lookup_value.
+        Retrieve a value from a specific column for the row where column_containing_reference == reference_value.
         """
         with self.engine.connect() as conn:
             result = conn.execute(
-                text(f'SELECT "{value_column}" FROM "{table_name}" WHERE "{row_lookup_column}" = :row_lookup_value'),
-                {"row_lookup_value": row_lookup_value}
+                text(f'SELECT "{target_column}" FROM "{table_name}" WHERE "{column_containing_reference}" = :reference_value'),
+                {"reference_value": reference_value}
             )
             row = result.fetchone()
             if row:
