@@ -284,3 +284,13 @@ class AirtableMultiManager:
         if manager:
             return manager.get_value_by_row_and_column(column_containing_reference, reference_value, target_column)
         return None
+
+    def execute_sql_query(self, table_name: str, sql_query: str):
+        """
+        Execute an arbitrary SQL query on the specified table using the SQLite backend.
+        Returns a list of dicts (rows) or None if not available.
+        """
+        manager = self.get_manager(table_name)
+        if manager:
+            return manager.execute_sql_query(sql_query)
+        return None

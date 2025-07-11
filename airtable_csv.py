@@ -96,3 +96,12 @@ class AirtableCSVManager:
         if self.sqlite_storage:
             return self.sqlite_storage.find_value_by_row_and_column(self.table_name, column_containing_reference, reference_value, target_column)
         return None
+
+    def execute_sql_query(self, sql_query: str):
+        """
+        Execute an arbitrary SQL query on this table using the SQLite backend.
+        Returns a list of dicts (rows) or None if not available.
+        """
+        if self.sqlite_storage:
+            return self.sqlite_storage.execute_sql_query(self.table_name, sql_query)
+        return None

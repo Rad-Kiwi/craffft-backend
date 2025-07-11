@@ -76,6 +76,21 @@ def get_value_from_db():
         if not row:
             return Response(f"No record found for table: {table_name}, {column_containing_reference}: {reference_value}", status=404)
         return jsonify(row)
+        
+
+@app.route("/table-sql-query", methods=['POST'])
+def table_sql_query():
+    data = request.get_json()
+    if not data:
+        return Response("Missing JSON body", status=400)
+    table_name = data.get("table_name")
+    sql_query = data.get("sql_query")
+    if not table_name or not sql_query:
+        return Response("Missing required parameters: table_name and sql_query", status=400)
+    results = multi_manager.execute_sql_query(table_name, sql_query)
+    if not results:
+        return Response(f"No results found for table: {table_name}, query: {sql_query}", status=404)
+    return jsonify(results)
 
 if __name__ == '__main__':
 

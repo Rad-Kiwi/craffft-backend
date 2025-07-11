@@ -98,3 +98,19 @@ class SQLiteStorage:
             if row:
                 return row[0]
             return None
+        
+    def execute_sql_query(self, table_name: str, sql_query: str):
+        """
+        Execute an arbitrary SQL query on the given table.
+        Returns a list of dicts (rows) or None if table does not exist or error.
+        """
+        try:
+            with self.engine.connect() as conn:
+                result = conn.execute(text(sql_query))
+                if result.returns_rows:
+                    columns = result.keys()
+                    return [dict(zip(columns, row)) for row in result.fetchall()]
+                return []
+        except Exception as e:
+            print(f"SQL query error on table {table_name}: {e}")
+            return None

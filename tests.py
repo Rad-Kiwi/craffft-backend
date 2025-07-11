@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 from airtable_multi_manager import AirtableMultiManager
 from sqlite_storage import SQLiteStorage
 from airtable_csv import AirtableCSVManager
+from student_data_manager import StudentDataManager
+import asyncio
 
 load_dotenv('.env.local')
 load_dotenv('.env')
@@ -115,6 +117,49 @@ def test_database_value_retrieval_multi_manager():
     if value:
         assert isinstance(value, str)
 
+
+def test_student_data_manager():
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    classroom_id = "1"
+    student_data_manager = StudentDataManager(multi_manager)
+    dashboard_info = student_data_manager.get_students_data_for_dashboard(classroom_id)
+
+    print(dashboard_info)
+    assert isinstance(dashboard_info, dict)
+    assert 'students' in dashboard_info
+    assert isinstance(dashboard_info['students'], list)
+    # for student in dashboard_info['students']:
+    #     assert isinstance(student, dict)
+    #     assert 'record_id' in student
+    #     assert 'name' in student
+    #     assert 'current_quest' in student
+    #     assert 'completed_steps' in student
+    #     assert 'progress' in student
+
+
+def test_sql_query():
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    multi_manager.update_all_tables()
+
+    sql = "SELECT * FROM craffft_steps WHERE name = 'Garlic Hunt'"
+    sql2 = "SELECT * FROM craffft_students WHERE current_class = '1'"
+    results = multi_manager.execute_sql_query('craffft_steps', sql)
+    results2 = multi_manager.execute_sql_query('craffft_students', sql2)
+    assert isinstance(results, list)
+    if results:
+        assert isinstance(results[0], dict)
+        assert 'name' in results[0]
+        assert results[0]['name'] == 'Garlic Hunt'
+
+    print("SQL Query Test Passed")
+    print(f"Results from 'craffft_steps': {results}"
+    
+          f"\nResults from 'craffft_students': {results2}"
+    )
+
+
 def run_all_tests():
     import sys
     import types
@@ -137,4 +182,6 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    run_all_tests()
+    # run_all_tests()
+    test_sql_query()
+    test_student_data_manager()
