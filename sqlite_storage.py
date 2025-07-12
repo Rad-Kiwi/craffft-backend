@@ -21,6 +21,38 @@ class SQLiteStorage:
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine, future=True)
 
+
+    def import_dict_rows(self, table_name: str, dict_rows: list):
+        """
+        Import a list of dictionaries (records) directly into the specified SQLite table.
+        Each dict should have the same keys (column names).
+        This bypasses CSV serialization and is robust to commas, quotes, etc.
+        """
+        if not dict_rows:
+            return
+        fieldnames = list(dict_rows[0].keys())
+        # Check for special characters in column names
+        import re
+        special_char_pattern = re.compile(r'[^a-zA-Z0-9_]')
+        for col in fieldnames:
+            if special_char_pattern.search(col):
+                print(f"Warning: Column name '{col}' in table '{table_name}' contains special characters. This may cause issues with SQLite.")
+        # Create table if not exists
+        columns_sql = ', '.join([f'"{col}" TEXT' for col in fieldnames])
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(f'CREATE TABLE IF NOT EXISTS "{table_name}" ({columns_sql})')
+            )
+            # Clear existing data (optional, comment out if you want to append)
+            conn.execute(text(f'DELETE FROM "{table_name}"'))
+            # Insert rows using named parameters and dicts
+            placeholders = ', '.join([f':{col}' for col in fieldnames])
+            insert_sql = text(f'INSERT INTO "{table_name}" ({", ".join(fieldnames)}) VALUES ({placeholders})')
+            for row in dict_rows:
+                # Ensure all keys exist (fill missing with empty string)
+                row_dict = {col: row.get(col, '') for col in fieldnames}
+                conn.execute(insert_sql, row_dict)
+
     def save_csv(self, table_name: str, csv_data: str):
         with self.Session() as session:
             obj = session.get(TableData, table_name)
@@ -31,6 +63,8 @@ class SQLiteStorage:
                 obj = TableData(table_name=table_name, csv_data=csv_data, updated_at=datetime.utcnow())
                 session.add(obj)
             session.commit()
+
+    
 
     def save_json(self, table_name: str, json_data: str):
         with self.Session() as session:

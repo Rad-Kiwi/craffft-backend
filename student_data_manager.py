@@ -38,10 +38,7 @@ class StudentDataManager:
 
     def get_students_data_for_dashboard(self, classroom_id):
         # Retrieve the students for the classroom
-        students = self.airtable_multi_manager.execute_sql_query(
-            'craffft_students',
-            f"SELECT * FROM craffft_students WHERE current_class = '{classroom_id}'"
-        )
+        students = self.get_student_by_class(classroom_id)
 
         unique_quests = []
         for student in students:
@@ -121,3 +118,33 @@ class StudentDataManager:
             'students': students
         }
         return return_data
+
+    def get_teacher_data(self, classroom_id):
+        """
+        Retrieve the teacher for the classroom using a direct SQL query.
+        Returns the first teacher found, or None if not found.
+        """
+        sql = f"SELECT * FROM craffft_teachers WHERE website_user_id = '{classroom_id}'"
+        teachers = self.airtable_multi_manager.execute_sql_query('craffft_teachers', sql)
+        if not teachers:
+            return None
+        return teachers[0]
+
+    def get_student_info(self, student_id):
+        """
+        Retrieve a student's data by their ID.
+        Returns the student data dict or None if not found.
+        """
+        sql = f"SELECT * FROM craffft_students WHERE website_id = '{student_id}'"
+        students = self.airtable_multi_manager.execute_sql_query('craffft_students', sql)
+        if not students:
+            return None
+        return students[0]
+
+    def get_student_by_class(self, classroom_id):
+        """
+        Retrieve all students in a specific classroom.
+        Returns a list of student data dicts or an empty list if none found.
+        """
+        sql = f"SELECT * FROM craffft_students WHERE current_class = '{classroom_id}'"
+        return self.airtable_multi_manager.execute_sql_query('craffft_students', sql    )

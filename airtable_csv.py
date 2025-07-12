@@ -13,7 +13,7 @@ class AirtableCSVManager:
         self.api_key = api_key
         self.sqlite_storage = sqlite_storage
 
-    # Fetch data from Airtable and store in SQLite only
+    # Fetch data from Airtable and store in SQLite using csv writer
     def update_csv_from_airtable(self):
         airtable = Airtable(self.base_id, self.table_name, self.api_key)
         records = airtable.get_all()
@@ -28,7 +28,11 @@ class AirtableCSVManager:
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
+        
         for record in records:
+            # Ensure row doesnt have a comma
+            record = self.record_comma_check(record)
+            # Write the record to CSV
             writer.writerow(record['fields'])
 
         csv_data = output.getvalue()
@@ -59,3 +63,16 @@ class AirtableCSVManager:
         if self.sqlite_storage:
             return self.sqlite_storage.execute_sql_query(self.table_name, sql_query)
         return None
+
+    @staticmethod
+    def record_comma_check(record) -> bool:
+        """
+        Check if the CSV data contains commas in any field.
+        Wraps fields with commas in double quotes.
+        """
+        for key in record['fields']:
+            if isinstance(record['fields'][key], str):
+                if ',' in record['fields'][key]:
+                    # Wrap in double quotes to handle commas
+                    record['fields'][key] = record['fields'][key].replace('"', '""')
+        return record

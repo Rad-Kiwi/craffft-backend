@@ -159,6 +159,16 @@ def test_sql_query():
           f"\nResults from 'craffft_students': {results2}"
     )
 
+def test_teacher_data():
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    website_user_id = "2"
+    student_data_manager = StudentDataManager(multi_manager)
+    teacher_data = student_data_manager.get_teacher_data(website_user_id)
+    print(f"Teacher Data: {teacher_data}")
+    assert isinstance(teacher_data, dict)
+    assert 'record_id' in teacher_data
+    assert 'school_name' in teacher_data
 
 def run_all_tests():
     import sys
@@ -184,4 +194,3 @@ def run_all_tests():
 if __name__ == "__main__":
     # run_all_tests()
     test_sql_query()
-    test_student_data_manager()

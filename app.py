@@ -3,6 +3,7 @@ from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 from airtable_multi_manager import AirtableMultiManager
+from student_data_manager import StudentDataManager
 import threading
 from scheduler import DailyAirtableUpdater
 
@@ -76,7 +77,35 @@ def get_value_from_db():
         if not row:
             return Response(f"No record found for table: {table_name}, {column_containing_reference}: {reference_value}", status=404)
         return jsonify(row)
-        
+
+
+@app.route("/get-student-data-dashboard/<classroom_id>", methods=['GET'])
+def get_students_for_dashboard(classroom_id):
+    if not classroom_id:
+        return Response("Missing classroom_id parameter", status=400)
+
+    if not student_data_manager:
+        return Response("StudentDataManager not found", status=404)
+
+    dashboard_info = student_data_manager.get_students_data_for_dashboard(classroom_id)
+    if not dashboard_info:
+        return Response(f"No data found for classroom_id: {classroom_id}", status=404)
+
+    return jsonify(dashboard_info)
+
+@app.route("/get-teacher-data/<id>", methods=['GET'])
+def get_teacher_data(id):
+    if not id:
+        return Response("Missing id parameter", status=400)
+
+    if not student_data_manager:
+        return Response("StudentDataManager not found", status=404)
+
+    teacher_info = student_data_manager.get_teacher_data(id)
+    if not teacher_info:
+        return Response(f"No data found for teacher_id: {id}", status=404)
+
+    return jsonify(teacher_info)
 
 @app.route("/table-sql-query", methods=['POST'])
 def table_sql_query():
@@ -97,6 +126,9 @@ if __name__ == '__main__':
     # Discover and add all tables from the base
     results = multi_manager.discover_and_add_tables_from_base()
     print(f"Added tables: {results}")
+
+    # Set up StudentDataManager
+    student_data_manager = StudentDataManager(multi_manager)
 
     # If in production mode, update all tables
     if ENVIRONMENT_MODE == 'Production':
