@@ -12,6 +12,7 @@ class AirtableCSVManager:
         self.table_name = table_name
         self.api_key = api_key
         self.sqlite_storage = sqlite_storage
+        self.has_updates = False  # Track if any updates have been made
 
     # Fetch data from Airtable and store in SQLite using csv writer
     def update_csv_from_airtable(self):
@@ -63,6 +64,31 @@ class AirtableCSVManager:
         if self.sqlite_storage:
             return self.sqlite_storage.execute_sql_query(self.table_name, sql_query)
         return None
+
+
+    def modify_field(self, column_containing_reference: str, reference_value: str, target_column: str, new_value):
+        """
+        Modify a field in the specified table.
+        
+        Args:
+            table_name: Name of the table
+            column_containing_reference: Column to look up the row
+            reference_value: Value to match in the lookup column
+            target_column: Column to update
+            new_value: New value to set
+        
+        Returns:
+            True if modified successfully, False otherwise
+        """
+        updated = False
+
+        if self.sqlite_storage:
+            updated = self.sqlite_storage.modify_field(self.table_name, column_containing_reference, reference_value, target_column, new_value)
+        
+        if updated:
+            self.has_updates = True
+
+        return updated
 
     @staticmethod
     def record_comma_check(record) -> bool:

@@ -2,7 +2,8 @@ import os
 from typing import Dict, Optional, List
 from airtable import Airtable
 from airtable_csv import AirtableCSVManager
-from sqlite_storage import SQLiteStorage  
+from sqlite_storage import SQLiteStorage
+from utilities import load_env  
 
 
 class AirtableMultiManager:
@@ -169,13 +170,8 @@ class AirtableMultiManager:
         Returns:
             AirtableMultiManager instance
         """
-        api_key = os.getenv('AIRTABLE_API_KEY')
-        base_id = os.getenv('AIRTABLE_BASE_ID')
-        
-        if not api_key:
-            raise ValueError("AIRTABLE_API_KEY environment variable is required")
-        if not base_id:
-            raise ValueError("AIRTABLE_BASE_ID environment variable is required")
+        api_key = load_env('AIRTABLE_API_KEY')
+        base_id = load_env('AIRTABLE_BASE_ID')
         
         # Use a shared SQLiteStorage instance
         sqlite_storage = SQLiteStorage()

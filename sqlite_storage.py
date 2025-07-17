@@ -148,3 +148,24 @@ class SQLiteStorage:
         except Exception as e:
             print(f"SQL query error on table {table_name}: {e}")
             return None
+
+
+    def modify_field(self, table_name: str, column_containing_reference: str, reference_value: str, target_column: str, new_value):
+        """
+        Modify a field in the specified table.
+        
+        Args:
+            table_name: Name of the table
+            column_containing_reference: Column to look up the row
+            reference_value: Value to match in the lookup column
+            target_column: Column to update
+            new_value: New value to set
+        Returns:
+            bool: True if modified successfully, False if row not found or error.
+        """
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text(f'UPDATE "{table_name}" SET "{target_column}" = :new_value WHERE "{column_containing_reference}" = :reference_value'),
+                {"new_value": new_value, "reference_value": reference_value}
+            )
+            return result.rowcount > 0

@@ -1,12 +1,10 @@
 import os
 import time
-from dotenv import load_dotenv
 import schedule
 from airtable_multi_manager import AirtableMultiManager
 
 class DailyAirtableUpdater:
     def __init__(self):
-        load_dotenv()
         # Initialize the multi-manager from environment variables
         self.multi_manager = AirtableMultiManager.from_environment()
         

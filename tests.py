@@ -1,13 +1,10 @@
 import os
-from dotenv import load_dotenv
 from airtable_multi_manager import AirtableMultiManager
 from sqlite_storage import SQLiteStorage
 from airtable_csv import AirtableCSVManager
 from student_data_manager import StudentDataManager
+from utilities import load_env
 import asyncio
-
-load_dotenv('.env.local')
-load_dotenv('.env')
 
 def test_basic_usage():
     multi_manager = AirtableMultiManager.from_environment()
@@ -19,8 +16,8 @@ def test_basic_usage():
         assert isinstance(csv_data, str)
 
 def test_custom_configuration():
-    api_key = os.getenv('AIRTABLE_API_KEY')
-    base_id = os.getenv('AIRTABLE_BASE_ID')
+    api_key = load_env('AIRTABLE_API_KEY')
+    base_id = load_env('AIRTABLE_BASE_ID')
     table_names = ["DataHub_Craffft", "AnotherTable", "ThirdTable"]
     multi_manager = AirtableMultiManager(api_key=api_key, base_id=base_id, table_names=table_names)
     multi_manager.add_table("NewTable")
@@ -31,8 +28,8 @@ def test_custom_configuration():
 
 def test_config_dict():
     config = {
-        'api_key': os.getenv('AIRTABLE_API_KEY'),
-        'base_id': os.getenv('AIRTABLE_BASE_ID'),
+        'api_key': load_env('AIRTABLE_API_KEY'),
+        'base_id': load_env('AIRTABLE_BASE_ID'),
         'table_names': ['DataHub_Craffft', 'Products', 'Customers']
     }
     multi_manager = AirtableMultiManager.from_config_dict(config)
@@ -81,8 +78,8 @@ def test_update_all_tables():
     assert isinstance(results, dict)
 
 def test_database_example():
-    api_key = os.getenv('AIRTABLE_API_KEY')
-    base_id = os.getenv('AIRTABLE_BASE_ID')
+    api_key = load_env('AIRTABLE_API_KEY')
+    base_id = load_env('AIRTABLE_BASE_ID')
     table_name = "craffft_steps"
     sqlite_store = SQLiteStorage()
     manager = AirtableCSVManager(base_id, table_name, api_key, sqlite_storage=sqlite_store)
@@ -91,8 +88,8 @@ def test_database_example():
     assert csv_data is None or isinstance(csv_data, str)
 
 def test_database_columns_example():
-    api_key = os.getenv('AIRTABLE_API_KEY')
-    base_id = os.getenv('AIRTABLE_BASE_ID')
+    api_key = load_env('AIRTABLE_API_KEY')
+    base_id = load_env('AIRTABLE_BASE_ID')
     table_name = "craffft_steps"
     sqlite_store = SQLiteStorage()
     manager = AirtableCSVManager(base_id, table_name, api_key, sqlite_storage=sqlite_store)
@@ -162,6 +159,7 @@ def test_sql_query():
 def test_teacher_data():
     multi_manager = AirtableMultiManager.from_environment()
     multi_manager.discover_and_add_tables_from_base()
+    m
     website_user_id = "2"
     student_data_manager = StudentDataManager(multi_manager)
     teacher_data = student_data_manager.get_teacher_data(website_user_id)
@@ -169,6 +167,27 @@ def test_teacher_data():
     assert isinstance(teacher_data, dict)
     assert 'record_id' in teacher_data
     assert 'school_name' in teacher_data
+
+def test_update_field():
+    print("Running test_update_field...")
+    multi_manager = AirtableMultiManager.from_environment()
+    print("Discovering and adding tables from base...")
+    multi_manager.discover_and_add_tables_from_base()
+
+    print("Getting manager for table 'craffft_steps'...")
+    table_name = "craffft_steps"
+    column_containing_reference = "name"
+    reference_value = "Garlic Hunt"
+    target_column = "description"
+    new_value = "Updated description for Garlic Hunt"
+
+    manager = multi_manager.get_manager(table_name)
+    if manager:
+        success = manager.modify_field(column_containing_reference, reference_value, target_column, new_value)
+        assert success is True
+        updated_value = manager.get_value_by_row_and_column(column_containing_reference, reference_value, target_column)
+        assert updated_value == new_value
+        print(f"Field '{target_column}' updated successfully for '{reference_value}' in table '{table_name}'. New value: {updated_value}")
 
 def run_all_tests():
     import sys
@@ -193,4 +212,4 @@ def run_all_tests():
 
 if __name__ == "__main__":
     # run_all_tests()
-    test_sql_query()
+    test_update_field()

@@ -1,24 +1,16 @@
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 import os
-from dotenv import load_dotenv
 from airtable_multi_manager import AirtableMultiManager
 from student_data_manager import StudentDataManager
 import threading
 from scheduler import DailyAirtableUpdater
+from utilities import load_env
 
 app = Flask(__name__)
 CORS(app)
 
-load_dotenv('.env.local')
-
-# Ensure required environment variables are set
-if not os.getenv('AIRTABLE_BASE_ID') or not os.getenv('AIRTABLE_API_KEY'):
-    load_dotenv('.env')
-if not os.getenv('AIRTABLE_BASE_ID') or not os.getenv('AIRTABLE_API_KEY'):
-    raise ValueError("Missing required environment variables: AIRTABLE_BASE_ID, AIRTABLE_TABLE_NAME, AIRTABLE_API_KEY")
-
-ENVIRONMENT_MODE = os.getenv('ENVIRONMENT_MODE', 'Production')
+ENVIRONMENT_MODE = load_env('ENVIRONMENT_MODE')
 
 # Initialize AirtableCSVManager with environment variables
 multi_manager = AirtableMultiManager.from_environment()
@@ -107,19 +99,32 @@ def get_teacher_data(id):
 
     return jsonify(teacher_info)
 
-@app.route("/table-sql-query", methods=['POST'])
-def table_sql_query():
+
+@app.route("/modify-field", methods=['POST'])
+def update_field():
     data = request.get_json()
     if not data:
         return Response("Missing JSON body", status=400)
+
     table_name = data.get("table_name")
-    sql_query = data.get("sql_query")
-    if not table_name or not sql_query:
-        return Response("Missing required parameters: table_name and sql_query", status=400)
-    results = multi_manager.execute_sql_query(table_name, sql_query)
-    if not results:
-        return Response(f"No results found for table: {table_name}, query: {sql_query}", status=404)
-    return jsonify(results)
+    reference_value = data.get("reference_value")
+    target_column = data.get("target_column")
+    new_value = data.get("new_value")
+    column_containing_reference = data.get("column_containing_reference", "id")
+
+    if not table_name or not reference_value or not target_column or new_value is None:
+        return Response("Missing required parameters: table_name, reference_value, target_column, new_value", status=400)
+
+    manager = multi_manager.get_manager(table_name)
+    if not manager:
+        return Response(f"No manager found for table: {table_name}", status=404)
+
+    success = manager.modify_field(column_containing_reference, reference_value, target_column, new_value)
+    if success:
+        return jsonify({"message": "Field updated successfully"})
+    else:
+        return Response(f"Failed to update field for table: {table_name}, {column_containing_reference}: {reference_value}, column: {target_column}", status=500)
+
 
 if __name__ == '__main__':
 
