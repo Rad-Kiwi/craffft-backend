@@ -290,3 +290,67 @@ class AirtableMultiManager:
         if manager:
             return manager.execute_sql_query(sql_query)
         return None
+
+    def upload_modified_tables_to_airtable(self) -> Dict[str, str]:
+        """
+        Upload all modified tables back to Airtable.
+        This will check which tables have been modified and upload their data back to Airtable.
+        
+        Returns:
+            Dictionary with table names as keys and status messages as values
+        """
+        results = {}
+        for table_name in self.managers.keys():
+            try:
+                manager = self.get_manager(table_name)
+                if manager and hasattr(manager, 'has_updates') and manager.has_updates:
+                    result = manager.upload_to_airtable()
+                    results[table_name] = result if result else "Failed to upload"
+                    # Reset the update flag after successful upload
+                    if result and not result.startswith("Error"):
+                        manager.has_updates = False
+                else:
+                    results[table_name] = "No modifications to upload"
+            except Exception as e:
+                results[table_name] = f"Error: {str(e)}"
+        return results
+
+    def upload_table_to_airtable(self, table_name: str) -> Optional[str]:
+        """
+        Upload a specific table back to Airtable.
+        
+        Args:
+            table_name: Name of the table to upload
+            
+        Returns:
+            Success message or None if failed
+        """
+        manager = self.get_manager(table_name)
+        if manager:
+            return manager.upload_to_airtable()
+        return None
+
+    def mark_table_as_modified(self, table_name: str):
+        """
+        Mark a table as modified so it will be uploaded on the next sync.
+        
+        Args:
+            table_name: Name of the table to mark as modified
+        """
+        manager = self.get_manager(table_name)
+        if manager:
+            manager.has_updates = True
+
+    def get_modified_tables(self) -> List[str]:
+        """
+        Get a list of tables that have been modified and need to be uploaded.
+        
+        Returns:
+            List of table names that have modifications
+        """
+        modified_tables = []
+        for table_name in self.managers.keys():
+            manager = self.get_manager(table_name)
+            if manager and hasattr(manager, 'has_updates') and manager.has_updates:
+                modified_tables.append(table_name)
+        return modified_tables

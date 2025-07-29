@@ -5,7 +5,7 @@ from airtable_multi_manager import AirtableMultiManager
 from student_data_manager import StudentDataManager
 import threading
 from scheduler import DailyAirtableUpdater
-from utilities import load_env
+from utilities import load_env, deep_jsonify, parse_database_row
 
 app = Flask(__name__)
 CORS(app)
@@ -14,6 +14,14 @@ ENVIRONMENT_MODE = load_env('ENVIRONMENT_MODE')
 
 # Initialize AirtableCSVManager with environment variables
 multi_manager = AirtableMultiManager.from_environment()
+
+
+def deep_jsonify_response(obj):
+    """
+    Helper function to deeply serialize complex objects before sending as JSON response
+    """
+    serialized = deep_jsonify(obj)
+    return jsonify(serialized)
 
 
 @app.route("/")
@@ -44,6 +52,26 @@ def get_tile_data(table_name):
     if not json_data:
         return Response(f"No data found for table: {table_name}", status=404)
     return jsonify(json_data)
+
+@app.route("/get-student-data/<student_record>", methods=['GET'])
+def get_student_data(student_record):
+    if not student_record:
+        return Response("Missing student_record parameter", status=400)
+
+    # Get the manager for the craffft_students table
+    manager = multi_manager.get_manager("craffft_students")
+    if not manager:
+        return Response("craffft_students table not found", status=404)
+    
+    # Look up the student by record_id
+    student_row = manager.get_row("record_id", student_record)
+
+    if not student_row:
+        return Response(f"No student found with record_id: {student_record}", status=404)
+
+    # Parse the database row to handle stringified lists
+    parsed_row = parse_database_row(student_row)
+    return jsonify(parsed_row)
 
 @app.route("/get-value-from-db", methods=['POST'])
 def get_value_from_db():
@@ -83,7 +111,9 @@ def get_students_for_dashboard(classroom_id):
     if not dashboard_info:
         return Response(f"No data found for classroom_id: {classroom_id}", status=404)
 
-    return jsonify(dashboard_info)
+    # Parse the dashboard info to handle stringified lists
+    parsed_dashboard = deep_jsonify(dashboard_info, parse_stringified_lists=True)
+    return jsonify(parsed_dashboard)
 
 @app.route("/get-teacher-data/<id>", methods=['GET'])
 def get_teacher_data(id):
@@ -124,6 +154,45 @@ def update_field():
         return jsonify({"message": "Field updated successfully"})
     else:
         return Response(f"Failed to update field for table: {table_name}, {column_containing_reference}: {reference_value}, column: {target_column}", status=500)
+
+
+@app.route("/upload-to-airtable", methods=['POST'])
+def upload_to_airtable():
+    """
+    Upload all modified tables back to Airtable
+    """
+    results = multi_manager.upload_modified_tables_to_airtable()
+    modified_tables = multi_manager.get_modified_tables()
+    
+    if not modified_tables:
+        return jsonify({"message": "No tables have been modified", "results": results}), 200
+    
+    success_count = sum(1 for result in results.values() if result and not result.startswith("Error"))
+    total_count = len(modified_tables)
+    
+    if success_count == total_count:
+        return jsonify({
+            "message": f"Successfully uploaded {success_count} modified tables to Airtable",
+            "results": results
+        }), 200
+    else:
+        return jsonify({
+            "message": f"Uploaded {success_count}/{total_count} tables. Some uploads failed.",
+            "results": results
+        }), 207  # 207 = Multi-Status
+
+
+
+@app.route("/get-modified-tables", methods=['GET'])
+def get_modified_tables():
+    """
+    Get a list of tables that have been modified and need to be uploaded
+    """
+    modified_tables = multi_manager.get_modified_tables()
+    return jsonify({
+        "modified_tables": modified_tables,
+        "count": len(modified_tables)
+    })
 
 
 if __name__ == '__main__':

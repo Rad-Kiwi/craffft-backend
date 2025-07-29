@@ -102,3 +102,58 @@ class AirtableCSVManager:
                     # Wrap in double quotes to handle commas
                     record['fields'][key] = record['fields'][key].replace('"', '""')
         return record
+
+    def upload_to_airtable(self) -> Optional[str]:
+        """
+        Upload the current SQLite table data back to Airtable.
+        This will get all records from SQLite and update/create them in Airtable.
+        
+        Returns:
+            Success message or None if failed
+        """
+        try:
+            if not self.sqlite_storage:
+                return "Error: No SQLite storage configured"
+            
+            # Get all records from SQLite
+            sql = f"SELECT * FROM \"{self.table_name}\""
+            records = self.sqlite_storage.execute_sql_query(self.table_name, sql)
+            
+            if not records:
+                return "No records found to upload"
+            
+            airtable = Airtable(self.base_id, self.table_name, self.api_key)
+            
+            # For now, we'll clear the table and re-create all records
+            # In a production system, you'd want to do a proper sync with updates/inserts/deletes
+            
+            # Get existing records to delete them
+            existing_records = airtable.get_all()
+            
+            # Delete existing records in batches
+            if existing_records:
+                record_ids = [record['id'] for record in existing_records]
+                # Airtable allows deletion of up to 10 records at a time
+                for i in range(0, len(record_ids), 10):
+                    batch = record_ids[i:i+10]
+                    airtable.batch_delete(batch)
+            
+            # Upload new records in batches
+            upload_records = []
+            for record in records:
+                # Convert SQLite record to Airtable format
+                airtable_record = {'fields': record}
+                upload_records.append(airtable_record)
+            
+            # Airtable allows creation of up to 10 records at a time
+            uploaded_count = 0
+            for i in range(0, len(upload_records), 10):
+                batch = upload_records[i:i+10]
+                result = airtable.batch_insert(batch)
+                if result:
+                    uploaded_count += len(result)
+            
+            return f"Successfully uploaded {uploaded_count} records to Airtable table {self.table_name}"
+            
+        except Exception as e:
+            return f"Error uploading to Airtable: {str(e)}"

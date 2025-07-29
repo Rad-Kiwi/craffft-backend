@@ -1,3 +1,4 @@
+from utilities import parse_database_row
 class StudentDataManager:
     def __init__(self, airtable_multi_manager):
         if airtable_multi_manager is None:
@@ -28,8 +29,30 @@ class StudentDataManager:
         """
         if not current_quest_obj or 'steps' not in current_quest_obj or 'num_steps' not in current_quest_obj:
             return "0.00"
-        intersection = [value for value in student.get('completed_steps', []) if value in current_quest_obj['steps']]
-        current_quest_step_total = current_quest_obj['num_steps']
+        
+        # Parse the student data to ensure completed_steps is a list
+        parsed_student = parse_database_row(student)
+        completed_steps = parsed_student.get('completed_steps', [])
+        
+        # Parse the quest object to ensure steps is a list
+        parsed_quest = parse_database_row(current_quest_obj)
+        quest_steps = parsed_quest.get('steps', [])
+        
+        # Ensure we have lists to work with
+        if not isinstance(completed_steps, list):
+            completed_steps = []
+        if not isinstance(quest_steps, list):
+            quest_steps = []
+            
+        intersection = [value for value in completed_steps if value in quest_steps]
+        
+        # Ensure num_steps is an integer
+        num_steps_raw = parsed_quest.get('num_steps', 0)
+        try:
+            current_quest_step_total = int(num_steps_raw) if num_steps_raw else 0
+        except (ValueError, TypeError):
+            current_quest_step_total = 0
+        
         if not current_quest_step_total:
             return "0.00"
         current_quest_progress = len(intersection) / current_quest_step_total if intersection else 0
@@ -42,8 +65,8 @@ class StudentDataManager:
 
         unique_quests = []
         for student in students:
-            # Defensive: ensure current_quest is a list and not empty
-            current_quest = student.get('current_quest')
+            # current quest can be a list, so we need to ensure it's handled correctly
+            current_quest = parse_database_row(student).get('current_quest')
             if not current_quest or not isinstance(current_quest, list) or not current_quest:
                 continue
             quest_id = current_quest[0]
@@ -65,7 +88,8 @@ class StudentDataManager:
         # Collect all step IDs from all quests
         steps_id_array = []
         for obj in quest_data:
-            steps = obj.get('steps', [])
+            parsed_quest = parse_database_row(obj)
+            steps = parsed_quest.get('steps', [])
             if isinstance(steps, list):
                 steps_id_array.extend(steps)
         # Remove duplicates
@@ -82,7 +106,7 @@ class StudentDataManager:
         # Calculate progress for each student on current quest
         for student in students:
             # get the current quest ID
-            current_quest = student.get('current_quest')
+            current_quest = parse_database_row(student).get('current_quest')
             if not current_quest or not isinstance(current_quest, list) or not current_quest:
                 continue
             current_quest_id = current_quest[0]  # they can only have 1 current quest
@@ -95,8 +119,17 @@ class StudentDataManager:
                 student['current_quest_name'] = current_quest_obj.get('quest_name', '')
                 student['current_quest_description'] = current_quest_obj.get('quest_description', '')
                 # fill in current step details
-                completed_steps = student.get('completed_steps', [])
-                quest_steps = current_quest_obj.get('steps', [])
+                parsed_student = parse_database_row(student)
+                parsed_quest = parse_database_row(current_quest_obj)
+                completed_steps = parsed_student.get('completed_steps', [])
+                quest_steps = parsed_quest.get('steps', [])
+                
+                # Ensure we have lists to work with
+                if not isinstance(completed_steps, list):
+                    completed_steps = []
+                if not isinstance(quest_steps, list):
+                    quest_steps = []
+                    
                 intersection = [value for value in completed_steps if value in quest_steps]
                 index = len(intersection)
                 # get the id of the next one. Safe lookup

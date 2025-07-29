@@ -126,13 +126,13 @@ def test_student_data_manager():
     assert isinstance(dashboard_info, dict)
     assert 'students' in dashboard_info
     assert isinstance(dashboard_info['students'], list)
-    # for student in dashboard_info['students']:
-    #     assert isinstance(student, dict)
-    #     assert 'record_id' in student
-    #     assert 'name' in student
-    #     assert 'current_quest' in student
-    #     assert 'completed_steps' in student
-    #     assert 'progress' in student
+    for student in dashboard_info['students']:
+        assert isinstance(student, dict)
+        assert 'record_id' in student
+        assert 'name' in student
+        assert 'current_quest' in student
+        assert 'completed_steps' in student
+        assert 'progress' in student
 
 
 def test_sql_query():
@@ -159,7 +159,6 @@ def test_sql_query():
 def test_teacher_data():
     multi_manager = AirtableMultiManager.from_environment()
     multi_manager.discover_and_add_tables_from_base()
-    m
     website_user_id = "2"
     student_data_manager = StudentDataManager(multi_manager)
     teacher_data = student_data_manager.get_teacher_data(website_user_id)
@@ -189,6 +188,66 @@ def test_update_field():
         assert updated_value == new_value
         print(f"Field '{target_column}' updated successfully for '{reference_value}' in table '{table_name}'. New value: {updated_value}")
 
+def test_upload_to_airtable():
+    """
+    Test uploading modified tables back to Airtable
+    """
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    multi_manager.update_all_tables()
+    
+    # Modify a field in a test table
+    table_name = "craffft_steps"
+    column_containing_reference = "name"
+    reference_value = "Garlic Hunt"
+    target_column = "description" 
+    new_value = "Test upload description - modified"
+    
+    manager = multi_manager.get_manager(table_name)
+    if manager:
+        # Modify the field
+        success = manager.modify_field(column_containing_reference, reference_value, target_column, new_value)
+        if success:
+            print(f"Field modified successfully. Table {table_name} marked for upload.")
+            
+            # Check that the table is marked as modified
+            modified_tables = multi_manager.get_modified_tables()
+            assert table_name in modified_tables
+            print(f"Modified tables: {modified_tables}")
+            
+            # Upload the modified table back to Airtable
+            upload_result = multi_manager.upload_table_to_airtable(table_name)
+            print(f"Upload result: {upload_result}")
+            
+            # Verify upload was successful
+            if upload_result and not upload_result.startswith("Error"):
+                print("Upload to Airtable successful!")
+                
+                # Check that the table is no longer marked as modified
+                modified_tables_after = multi_manager.get_modified_tables()
+                print(f"Modified tables after upload: {modified_tables_after}")
+            else:
+                print(f"Upload failed: {upload_result}")
+
+def test_get_student_by_record_id():
+    """
+    Test getting a student by their record_id
+    """
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+
+    student_record = "recBc7qFYaO2797YO" 
+    table_name = "craffft_students"
+    
+    print(f"Getting student by record_id: {student_record} from table: {table_name}")
+    manager = multi_manager.get_manager(table_name)
+    
+    student_row = manager.get_row("record_id", student_record)
+    
+    assert isinstance(student_row, dict)
+    assert 'record_id' in student_row
+    assert student_row['record_id'] == student_record
+
 def run_all_tests():
     import sys
     import types
@@ -211,5 +270,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    # run_all_tests()
-    test_update_field()
+    run_all_tests()

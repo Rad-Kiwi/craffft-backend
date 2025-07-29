@@ -1,4 +1,7 @@
 import os
+import json
+import datetime
+import decimal
 from dotenv import load_dotenv
 
 # Load environment variables once at module import time
@@ -18,3 +21,144 @@ def load_env(KEY_NAME):
         raise ValueError(f"Environment variable '{KEY_NAME}' not found in .env or .env.local files.")
     
     return value
+
+
+def deep_jsonify(obj, max_depth=10, current_depth=0, parse_stringified_lists=True):
+    """
+    Convert a complex object with nested structures to a JSON-serializable format.
+    Handles multiple levels of nesting including dicts, lists, tuples, sets, and custom objects.
+    
+    Args:
+        obj: The object to serialize
+        max_depth: Maximum recursion depth to prevent infinite loops
+        current_depth: Current recursion depth (internal use)
+        parse_stringified_lists: Whether to attempt parsing string representations of lists
+    
+    Returns:
+        JSON-serializable version of the object
+    """
+    # Prevent infinite recursion
+    if current_depth >= max_depth:
+        return f"<max_depth_reached: {type(obj).__name__}>"
+    
+    # Handle None
+    if obj is None:
+        return None
+    
+    # Handle basic JSON-serializable types (but check strings for stringified lists)
+    if isinstance(obj, str):
+        # Try to parse stringified lists if enabled
+        if parse_stringified_lists and obj.strip().startswith('[') and obj.strip().endswith(']'):
+            try:
+                import ast
+                parsed = ast.literal_eval(obj)
+                if isinstance(parsed, (list, tuple)):
+                    return deep_jsonify(parsed, max_depth, current_depth + 1, parse_stringified_lists)
+            except (ValueError, SyntaxError):
+                # If parsing fails, return as string
+                pass
+        return obj
+    
+    if isinstance(obj, (int, float, bool)):
+        return obj
+    
+    # Handle datetime objects
+    if isinstance(obj, (datetime.datetime, datetime.date, datetime.time)):
+        return obj.isoformat()
+    
+    # Handle decimal objects
+    if isinstance(obj, decimal.Decimal):
+        return float(obj)
+    
+    # Handle dictionaries
+    if isinstance(obj, dict):
+        return {
+            str(key): deep_jsonify(value, max_depth, current_depth + 1, parse_stringified_lists)
+            for key, value in obj.items()
+        }
+    
+    # Handle lists and tuples
+    if isinstance(obj, (list, tuple)):
+        return [
+            deep_jsonify(item, max_depth, current_depth + 1, parse_stringified_lists)
+            for item in obj
+        ]
+    
+    # Handle sets
+    if isinstance(obj, set):
+        return [
+            deep_jsonify(item, max_depth, current_depth + 1, parse_stringified_lists)
+            for item in obj
+        ]
+    
+    # Handle custom objects by converting to dict
+    if hasattr(obj, '__dict__'):
+        return {
+            key: deep_jsonify(value, max_depth, current_depth + 1, parse_stringified_lists)
+            for key, value in obj.__dict__.items()
+            if not key.startswith('_')  # Skip private attributes
+        }
+    
+    # Fallback for any other type
+    try:
+        return str(obj)
+    except Exception:
+        return f"<non_serializable: {type(obj).__name__}>"
+
+
+def safe_jsonify(obj, **kwargs):
+    """
+    Safely convert an object to JSON string with deep serialization.
+    
+    Args:
+        obj: Object to serialize
+        **kwargs: Additional arguments passed to json.dumps()
+    
+    Returns:
+        JSON string representation of the object
+    """
+    try:
+        serializable_obj = deep_jsonify(obj)
+        return json.dumps(serializable_obj, indent=2, **kwargs)
+    except Exception as e:
+        return json.dumps({
+            "error": f"Serialization failed: {str(e)}",
+            "type": type(obj).__name__
+        }, indent=2)
+
+
+def parse_database_row(row):
+    """
+    Specialized function to parse database rows that may contain stringified lists.
+    This is optimized for your specific use case with Airtable data.
+    
+    Args:
+        row: Dictionary representing a database row
+    
+    Returns:
+        Parsed row with stringified lists converted to actual lists
+    """
+    if not isinstance(row, dict):
+        return deep_jsonify(row, parse_stringified_lists=True)
+    
+    parsed_row = {}
+    for key, value in row.items():
+        if isinstance(value, str):
+            # Check if it looks like a stringified list
+            stripped = value.strip()
+            if stripped.startswith('[') and stripped.endswith(']'):
+                try:
+                    import ast
+                    parsed_value = ast.literal_eval(stripped)
+                    if isinstance(parsed_value, (list, tuple)):
+                        parsed_row[key] = list(parsed_value)  # Convert tuples to lists
+                    else:
+                        parsed_row[key] = value  # Keep as string if not a list/tuple
+                except (ValueError, SyntaxError):
+                    parsed_row[key] = value  # Keep as string if parsing fails
+            else:
+                parsed_row[key] = value
+        else:
+            parsed_row[key] = deep_jsonify(value, parse_stringified_lists=True)
+    
+    return parsed_row
