@@ -22,11 +22,20 @@ try:
     results = multi_manager.discover_and_add_tables_from_base()
     print(f"Added tables: {results}")
     
-    # If in production mode, update all tables
-    if ENVIRONMENT_MODE == 'Production':
-        print("Running in Production mode")
+    # Check if we're using PostgreSQL (Heroku) or in Production mode
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url or ENVIRONMENT_MODE == 'Production':
+        print("Running in Production mode or using PostgreSQL - updating all tables")
         results = multi_manager.update_all_tables()
-        print("All tables updated successfully: ", results)
+        print("All tables update results: ", results)
+        
+        # Check if critical tables failed
+        critical_tables = ['craffft_students', 'craffft_teachers', 'craffft_steps', 'craffft_quests']
+        failed_critical = [table for table in critical_tables if table in results and 'Error' in str(results[table])]
+        if failed_critical:
+            print(f"Warning: Critical tables failed to update: {failed_critical}")
+        else:
+            print("All critical tables updated successfully")
     
     # Set up StudentDataManager
     student_data_manager = StudentDataManager(multi_manager)

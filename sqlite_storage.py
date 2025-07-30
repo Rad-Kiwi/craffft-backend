@@ -62,7 +62,8 @@ class SQLiteStorage:
             conn.execute(text(f'DELETE FROM "{table_name}"'))
             # Insert rows using named parameters and dicts
             placeholders = ', '.join([f':{col}' for col in fieldnames])
-            insert_sql = text(f'INSERT INTO "{table_name}" ({", ".join(fieldnames)}) VALUES ({placeholders})')
+            quoted_fieldnames = ', '.join([f'"{col}"' for col in fieldnames])
+            insert_sql = text(f'INSERT INTO "{table_name}" ({quoted_fieldnames}) VALUES ({placeholders})')
             for row in dict_rows:
                 # Ensure all keys exist (fill missing with empty string)
                 row_dict = {col: row.get(col, '') for col in fieldnames}
@@ -117,7 +118,8 @@ class SQLiteStorage:
             conn.execute(text(f'DELETE FROM "{table_name}"'))
             # Insert rows using named parameters and dicts
             placeholders = ', '.join([f':{col}' for col in fieldnames])
-            insert_sql = text(f'INSERT INTO "{table_name}" ({", ".join(fieldnames)}) VALUES ({placeholders})')
+            quoted_fieldnames = ', '.join([f'"{col}"' for col in fieldnames])
+            insert_sql = text(f'INSERT INTO "{table_name}" ({quoted_fieldnames}) VALUES ({placeholders})')
             for row in reader:
                 # Ensure all keys exist (fill missing with empty string)
                 row_dict = {col: row.get(col, '') for col in fieldnames}

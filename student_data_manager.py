@@ -16,6 +16,8 @@ class StudentDataManager:
         """
         Safely get a step data dict from a list of dicts by key.
         """
+        if not data or not isinstance(data, list):
+            return None
         for item in data:
             if item.get(key_field) == key:
                 return item
@@ -102,6 +104,11 @@ class StudentDataManager:
             'craffft_steps',
             sql
         )
+        
+        # If step_data failed (table doesn't exist), use empty list to prevent crashes
+        if step_data is None:
+            print("Warning: Failed to retrieve step data - table may not exist")
+            step_data = []
 
         # Calculate progress for each student on current quest
         for student in students:
