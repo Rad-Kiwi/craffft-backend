@@ -15,9 +15,24 @@ class TableData(Base):
 
 class SQLiteStorage:
     def __init__(self, db_path: str = "data/airtable_data.db"):
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        self.db_path = db_path
-        self.engine = create_engine(f'sqlite:///{db_path}', echo=False, future=True)
+        # Check if we're on Heroku (DATABASE_URL environment variable)
+        database_url = os.environ.get('DATABASE_URL')
+        
+        if database_url:
+            # Heroku Postgres
+            # Heroku provides postgres:// but SQLAlchemy needs postgresql://
+            if database_url.startswith('postgres://'):
+                database_url = database_url.replace('postgres://', 'postgresql://')
+            self.db_path = database_url
+            self.engine = create_engine(database_url, echo=False, future=True)
+            print(f"Using Heroku Postgres database")
+        else:
+            # Local SQLite
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            self.db_path = db_path
+            self.engine = create_engine(f'sqlite:///{db_path}', echo=False, future=True)
+            print(f"Using SQLite: {db_path}")
+            
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine, future=True)
 

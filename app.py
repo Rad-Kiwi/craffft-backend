@@ -201,8 +201,6 @@ if __name__ == '__main__':
     results = multi_manager.discover_and_add_tables_from_base()
     print(f"Added tables: {results}")
 
-    # Set up StudentDataManager
-    student_data_manager = StudentDataManager(multi_manager)
 
     # If in production mode, update all tables
     if ENVIRONMENT_MODE == 'Production':
@@ -219,4 +217,12 @@ if __name__ == '__main__':
         scheduler_thread = threading.Thread(target=start_scheduler, daemon=True)
         scheduler_thread.start()
 
-    app.run(debug=True)
+    # Set up StudentDataManager
+    try:
+        student_data_manager = StudentDataManager(multi_manager)
+        print("StudentDataManager initialized successfully")
+    except Exception as e:
+        print(f"Failed to initialize StudentDataManager: {e}")
+        student_data_manager = None
+
+    app.run(debug=(ENVIRONMENT_MODE != 'Production'))
