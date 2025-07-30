@@ -15,6 +15,26 @@ ENVIRONMENT_MODE = load_env('ENVIRONMENT_MODE')
 # Initialize AirtableCSVManager with environment variables
 multi_manager = AirtableMultiManager.from_environment()
 
+# Initialize StudentDataManager globally with error handling
+student_data_manager = None
+try:
+    # Discover and add all tables from the base
+    results = multi_manager.discover_and_add_tables_from_base()
+    print(f"Added tables: {results}")
+    
+    # If in production mode, update all tables
+    if ENVIRONMENT_MODE == 'Production':
+        print("Running in Production mode")
+        results = multi_manager.update_all_tables()
+        print("All tables updated successfully: ", results)
+    
+    # Set up StudentDataManager
+    student_data_manager = StudentDataManager(multi_manager)
+    print("StudentDataManager initialized successfully")
+except Exception as e:
+    print(f"Failed to initialize StudentDataManager: {e}")
+    student_data_manager = None
+
 
 def deep_jsonify_response(obj):
     """
@@ -196,19 +216,10 @@ def get_modified_tables():
 
 
 if __name__ == '__main__':
-
-    # Discover and add all tables from the base
-    results = multi_manager.discover_and_add_tables_from_base()
-    print(f"Added tables: {results}")
-
-
-    # If in production mode, update all tables
-    if ENVIRONMENT_MODE == 'Production':
-        print("Running in Production mode")
-
-        results = multi_manager.update_all_tables()
-        print("All tables updated successfully: ", results)
-    
+    # Start the scheduler if in production mode
+    if ENVIRONMENT_MODE == 'Production' and student_data_manager:
+        print("Starting scheduler for Production mode")
+        
         # Start the scheduler in a background thread
         def start_scheduler():
             updater = DailyAirtableUpdater()
@@ -216,13 +227,5 @@ if __name__ == '__main__':
 
         scheduler_thread = threading.Thread(target=start_scheduler, daemon=True)
         scheduler_thread.start()
-
-    # Set up StudentDataManager
-    try:
-        student_data_manager = StudentDataManager(multi_manager)
-        print("StudentDataManager initialized successfully")
-    except Exception as e:
-        print(f"Failed to initialize StudentDataManager: {e}")
-        student_data_manager = None
 
     app.run(debug=(ENVIRONMENT_MODE != 'Production'))
