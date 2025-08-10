@@ -2,6 +2,9 @@
 
 This is the backend API for the CRAFFFT educational platform, providing data management and student progress tracking functionality.
 
+Currently deployed here:
+https://craffft-api-e21e23f89690.herokuapp.com/
+
 The backend manages multiple Airtable tables containing student data, teacher information, quests, steps, and curriculum data. It provides RESTful API endpoints for the frontend application and handles data synchronization between Airtable and a local/cloud database.
 
 ## Features
