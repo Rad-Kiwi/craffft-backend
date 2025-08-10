@@ -15,7 +15,9 @@ class AirtableCSVManager:
         self.has_updates = False  # Track if any updates have been made
 
     # Fetch data from Airtable and store in SQLite using csv writer
-    def update_csv_from_airtable(self):
+    def update_database_from_airtable(self):
+        # Note: Ideally this woul be done with a dictwriter, but I cant seem to get it to work
+
         airtable = Airtable(self.base_id, self.table_name, self.api_key)
         records = airtable.get_all()
         if not records:

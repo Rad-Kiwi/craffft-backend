@@ -12,6 +12,8 @@ CORS(app)
 
 ENVIRONMENT_MODE = load_env('ENVIRONMENT_MODE')
 
+# --- Initialisation ---
+
 # Initialize AirtableCSVManager with environment variables
 multi_manager = AirtableMultiManager.from_environment()
 
@@ -53,9 +55,11 @@ def deep_jsonify_response(obj):
     return jsonify(serialized)
 
 
+# --- Routes ---
+
 @app.route("/")
 def home():
-    return "Hello, Flask!"
+    return "Up and running! View routes at: https://github.com/radkiwi/craffft-backend"
 
 
 @app.route("/get-table-as-csv/<table_name>", methods=['GET'])
@@ -223,6 +227,7 @@ def get_modified_tables():
         "count": len(modified_tables)
     })
 
+# --- Scheduler Initialisation ---
 
 if __name__ == '__main__':
     # Start the scheduler if in production mode
