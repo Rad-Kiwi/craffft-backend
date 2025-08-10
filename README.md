@@ -1,11 +1,17 @@
-# kelp-helpers-backend
-This is the backend for the kelp helpers website
+# craffft-backend
 
-Its main task currently is to grab data from airtable.
+This is the backend API for the CRAFFFT educational platform, providing data management and student progress tracking functionality.
 
-It does this both once on the backend startup, and once daily at midnight.
+The backend manages multiple Airtable tables containing student data, teacher information, quests, steps, and curriculum data. It provides RESTful API endpoints for the frontend application and handles data synchronization between Airtable and a local/cloud database.
 
-If there are issues accessing airtable, currently the data is also stored on github as a backup, although this may be removed later if there are too many updates.
+## Features
+
+- **Multi-table Airtable Integration**: Automatically discovers and syncs multiple tables from Airtable
+- **Student Progress Tracking**: Calculates student progress on educational quests and steps  
+- **Teacher Dashboard Support**: Provides aggregated data for classroom management
+- **Database Abstraction**: Supports both SQLite (development) and PostgreSQL (production)
+- **Automatic Data Sync**: Daily scheduled updates from Airtable
+- **Deep JSON Serialization**: Handles complex data structures including stringified lists
 
 
 ## Installation
@@ -22,9 +28,17 @@ Create a `.env.local` file in the project root with the following content:
 
 ```
 AIRTABLE_BASE_ID=your_base_id
-AIRTABLE_TABLE_NAME=your_table_name
 AIRTABLE_API_KEY=your_airtable_api_key
+ENVIRONMENT_MODE=Development
 ```
+
+**Required Variables:**
+- `AIRTABLE_BASE_ID` — Your Airtable base ID
+- `AIRTABLE_API_KEY` — Your Airtable API key with read/write permissions
+
+**Optional Variables:**
+- `ENVIRONMENT_MODE` — Set to `Production` for production deployment (default: `Development`)
+- `DATABASE_URL` — PostgreSQL connection string (automatically set on Heroku)
 
 You can also use `.env` instead of `.env.local`.  
 Variables in `.env.local` will override those in `.env` if both exist.
@@ -41,10 +55,62 @@ The app will be available at [http://127.0.0.1:5000/](http://127.0.0.1:5000/).
 
 ## Endpoints
 
-- `/` — Health check, returns "Hello, Flask!"
-- `/airtable-csv` — Returns Airtable data as JSON.
-- `/save-airtable-csv` — Saves Airtable data as CSV to `data/coastline-tiles-with-data.csv`.
+### Health Check
+- `GET /` — Returns "Hello, Flask!" to verify the API is running
 
-## Scheduler
+### Student Data
+- `GET /get-student-data/<student_record>` — Get individual student data by record ID
+- `GET /get-student-data-dashboard/<classroom_id>` — Get dashboard data for all students in a classroom
 
-The scheduler runs automatically when you start the app and updates the CSV file daily at midnight.
+### Teacher Data  
+- `GET /get-teacher-data/<id>` — Get teacher information by website user ID
+
+### Table Management
+- `GET /get-table-as-csv/<table_name>` — Download table data as CSV
+- `GET /get-table-as-json/<table_name>` — Get table data as JSON
+- `GET /update-server-from-airtable` — Manually trigger update from Airtable
+
+### Database Operations
+- `POST /get-value-from-db` — Query specific values from database tables
+- `POST /modify-field` — Update specific fields in database records
+
+### Airtable Sync
+- `POST /upload-to-airtable` — Upload modified data back to Airtable
+- `GET /get-modified-tables` — List tables that have been modified locally
+
+## Database
+
+The application supports two database modes:
+
+- **Development**: Uses SQLite with data stored in `data/airtable_data.db`
+- **Production**: Uses PostgreSQL (automatically detected via `DATABASE_URL` environment variable)
+
+Tables are automatically created and populated from Airtable data:
+- `craffft_students` — Student information and progress
+- `craffft_teachers` — Teacher and classroom data  
+- `craffft_quests` — Educational quest definitions
+- `craffft_steps` — Individual learning steps
+- `craffft_responses` — Student responses and submissions
+- Additional curriculum and achievement tables
+
+## Deployment
+
+### Local Development
+```bash
+python app.py
+```
+
+### Heroku Deployment
+The app is configured for Heroku deployment with:
+- `Procfile` for web process configuration
+- `runtime.txt` for Python version specification
+- Automatic PostgreSQL database detection
+- Environment-based configuration
+
+## Data Synchronization
+
+The scheduler runs automatically and updates data from Airtable:
+- **Production**: Daily at midnight + on startup
+- **Development**: On-demand via API endpoints
+
+This ensures the local database stays synchronized with the latest Airtable data.
