@@ -30,6 +30,7 @@ class StudentDataManager:
         Returns a string formatted to two decimal places.
         """
         if not current_quest_obj or 'steps' not in current_quest_obj or 'num_steps' not in current_quest_obj:
+            print('Missing quest object')
             return "0.00"
         
         # Parse the student data to ensure completed_steps is a list
@@ -45,8 +46,9 @@ class StudentDataManager:
             completed_steps = []
         if not isinstance(quest_steps, list):
             quest_steps = []
-            
-        intersection = [value for value in completed_steps if value in quest_steps]
+
+        # Check which completed steps can be found in the quest    
+        intersection = [step for step in completed_steps if step in quest_steps]
         
         # Ensure num_steps is an integer
         num_steps_raw = parsed_quest.get('num_steps', 0)
@@ -136,7 +138,8 @@ class StudentDataManager:
                     completed_steps = []
                 if not isinstance(quest_steps, list):
                     quest_steps = []
-                    
+
+                # Find which steps match the quest    
                 intersection = [value for value in completed_steps if value in quest_steps]
                 index = len(intersection)
                 # get the id of the next one. Safe lookup

@@ -3,7 +3,8 @@ from typing import Dict, Optional, List
 from airtable import Airtable
 from airtable_csv import AirtableCSVManager
 from sqlite_storage import SQLiteStorage
-from utilities import load_env  
+from utilities import load_env
+import requests
 
 
 class AirtableMultiManager:
@@ -89,7 +90,7 @@ class AirtableMultiManager:
             return manager.read_csv()
         return None
     
-    def update_csv_from_airtable(self, table_name: str) -> Optional[str]:
+    def update_database_from_airtable(self, table_name: str) -> Optional[str]:
         """
         Update CSV file from Airtable for a specific table.
         
@@ -215,8 +216,6 @@ class AirtableMultiManager:
             base_id = self.base_id
             
         try:
-            import requests
-            
             headers = {
                 'Authorization': f'Bearer {self.api_key}',
                 'Content-Type': 'application/json'

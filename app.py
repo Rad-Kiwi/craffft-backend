@@ -12,6 +12,8 @@ CORS(app)
 
 ENVIRONMENT_MODE = load_env('ENVIRONMENT_MODE')
 
+# --- Initialisation ---
+
 # Initialize AirtableCSVManager with environment variables
 multi_manager = AirtableMultiManager.from_environment()
 
@@ -53,9 +55,11 @@ def deep_jsonify_response(obj):
     return jsonify(serialized)
 
 
+# --- Routes ---
+
 @app.route("/")
 def home():
-    return "Hello, Flask!"
+    return "Up and running! View routes at: https://github.com/radkiwi/craffft-backend"
 
 
 @app.route("/get-table-as-csv/<table_name>", methods=['GET'])
@@ -82,7 +86,27 @@ def get_tile_data(table_name):
         return Response(f"No data found for table: {table_name}", status=404)
     return jsonify(json_data)
 
-@app.route("/get-student-data/<student_record>", methods=['GET'])
+@app.route("/get-student-data-from-websiteId/<website_id>", methods=['GET'])
+def get_student_data_from_website(website_id):
+    if not website_id:
+        return Response("Missing website_id parameter", status=400)
+
+    # Get the manager for the craffft_students table
+    manager = multi_manager.get_manager("craffft_students")
+    if not manager:
+        return Response("craffft_students table not found", status=404)
+
+    # Look up the student by website_id
+    student_row = manager.get_row("website_id", website_id)
+
+    if not student_row:
+        return Response(f"No student found with website_id: {website_id}", status=404)
+
+    # Parse the database row to handle stringified lists
+    parsed_row = parse_database_row(student_row)
+    return jsonify(parsed_row)
+
+@app.route("/get-student-data-from-record/<student_record>", methods=['GET'])
 def get_student_data(student_record):
     if not student_record:
         return Response("Missing student_record parameter", status=400)
@@ -223,6 +247,7 @@ def get_modified_tables():
         "count": len(modified_tables)
     })
 
+# --- Scheduler Initialisation ---
 
 if __name__ == '__main__':
     # Start the scheduler if in production mode
