@@ -102,7 +102,7 @@ class AirtableMultiManager:
         """
         manager = self.get_manager(table_name)
         if manager:
-            return manager.update_csv_from_airtable()
+            return manager.update_database_from_airtable()
         return None
     
     def convert_csv_to_json(self, table_name: str):
@@ -130,7 +130,7 @@ class AirtableMultiManager:
         results = {}
         for table_name in self.managers.keys():
             try:
-                result = self.update_csv_from_airtable(table_name)
+                result = self.update_database_from_airtable(table_name)
                 results[table_name] = result if result else "Failed to update"
             except Exception as e:
                 results[table_name] = f"Error: {str(e)}"
