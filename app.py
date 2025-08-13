@@ -4,7 +4,7 @@ import os
 from airtable_multi_manager import AirtableMultiManager
 from student_data_manager import StudentDataManager
 import threading
-from scheduler import DailyAirtableUpdater
+from scheduler import DailyAirtableUploader
 from utilities import load_env, deep_jsonify, parse_database_row
 
 app = Flask(__name__)
@@ -283,13 +283,13 @@ def get_modified_tables():
 
 if __name__ == '__main__':
     # Start the scheduler if in production mode
-    if ENVIRONMENT_MODE == 'Production' and student_data_manager:
+    if ENVIRONMENT_MODE == 'Production': 
         print("Starting scheduler for Production mode")
         
         # Start the scheduler in a background thread
         def start_scheduler():
-            updater = DailyAirtableUpdater()
-            updater.run_daily("00:00")  # Set desired time
+            uploader = DailyAirtableUploader()
+            uploader.run_daily("00:00")  # Set desired time
 
         scheduler_thread = threading.Thread(target=start_scheduler, daemon=True)
         scheduler_thread.start()
