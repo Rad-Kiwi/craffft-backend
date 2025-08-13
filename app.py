@@ -14,7 +14,7 @@ ENVIRONMENT_MODE = load_env('ENVIRONMENT_MODE')
 
 # --- Initialisation ---
 
-# Initialize AirtableCSVManager with environment variables
+# Initialize TableManager with environment variables
 multi_manager = AirtableMultiManager.from_environment()
 
 # Initialize StudentDataManager globally with error handling
@@ -64,7 +64,7 @@ def home():
 
 
 @app.route("/get-table-as-csv/<table_name>", methods=['GET'])
-def get_airtable_csv(table_name):
+def get_table_manager(table_name):
     csv_data = multi_manager.get_csv_data(table_name)
     if not csv_data:
         return Response(f"No data found for table: {table_name}", status=404)
