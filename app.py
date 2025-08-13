@@ -72,11 +72,14 @@ def get_airtable_csv(table_name):
 
 @app.route("/update-server-from-airtable", methods=['GET'])
 def update_server_from_airtable():
-    success = multi_manager.update_all_tables()
-    if success:
-        return "CSV saved to /data/<your_table_name>.csv", 200
+    results = multi_manager.update_all_tables()
+    if results:
+        return jsonify({
+            "message": "All tables updated from Airtable",
+            "results": results
+        }), 200
     else:
-        return Response(f"Failed to update CSV from Airtable: {results}", status=500)
+        return Response(f"Failed to update from Airtable: {results}", status=500)
 
 
 @app.route("/get-table-as-json/<table_name>", methods=['GET'])
