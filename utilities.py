@@ -4,6 +4,9 @@ import datetime
 import decimal
 from dotenv import load_dotenv
 
+critical_tables = ['craffft_students', 'craffft_teachers', 'craffft_quests']
+
+
 # Load environment variables once at module import time
 # Load .env first (defaults), then .env.local (overrides)
 load_dotenv('.env')

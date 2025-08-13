@@ -5,7 +5,7 @@ from airtable_multi_manager import AirtableMultiManager
 from student_data_manager import StudentDataManager
 import threading
 from scheduler import DailyAirtableUploader
-from utilities import load_env, deep_jsonify, parse_database_row
+from utilities import load_env, deep_jsonify, parse_database_row, critical_tables
 
 app = Flask(__name__)
 CORS(app)
@@ -24,24 +24,25 @@ try:
     results = multi_manager.discover_and_add_tables_from_base()
     print(f"Added tables: {results}")
     
-    # Check if we're using PostgreSQL (Heroku) or in Production mode
-    database_url = os.environ.get('DATABASE_URL')
-    if database_url or ENVIRONMENT_MODE == 'Production':
-        print("Running in Production mode or using PostgreSQL - updating all tables")
+    # Check if database has data - only update from Airtable if empty
+    database_has_data = multi_manager.sqlite_storage.has_data_in_critical_tables()
+    
+    if not database_has_data:
+        print("Database appears empty - performing initial sync from Airtable")
         results = multi_manager.update_all_tables()
-        print("All tables update results: ", results)
+        print("Initial sync results: ", results)
         
         # Check if critical tables failed
-        critical_tables = ['craffft_students', 'craffft_teachers', 'craffft_steps', 'craffft_quests']
         failed_critical = [table for table in critical_tables if table in results and 'Error' in str(results[table])]
         if failed_critical:
             print(f"Warning: Critical tables failed to update: {failed_critical}")
-        else:
-            print("All critical tables updated successfully")
+            
+    else:
+        print("Database has existing data - skipping initial sync from Airtable")
     
     # Set up StudentDataManager
     student_data_manager = StudentDataManager(multi_manager)
-    print("StudentDataManager initialized successfully")
+
 except Exception as e:
     print(f"Failed to initialize StudentDataManager: {e}")
     student_data_manager = None

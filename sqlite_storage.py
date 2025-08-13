@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime
 from sqlalchemy import create_engine, Column, String, Text, DateTime, text
 from sqlalchemy.orm import declarative_base, sessionmaker
-from utilities import load_env
+from utilities import load_env, critical_tables
 
 Base = declarative_base()
 
@@ -188,3 +188,43 @@ class SQLiteStorage:
                 {"new_value": new_value, "reference_value": reference_value}
             )
             return result.rowcount > 0
+
+    def has_data_in_critical_tables(self) -> bool:
+        """
+        Check if ALL critical tables have data.
+        
+        Returns:
+            bool: True if ALL critical tables have data, False if any are empty or missing
+        """
+        tables_with_data = []
+        
+        try:
+            with self.engine.connect() as conn:
+                for table_name in critical_tables:
+                    try:
+                        # Check if table exists and has data
+                        result = conn.execute(text(f'SELECT COUNT(*) as count FROM "{table_name}" LIMIT 1'))
+                        row = result.fetchone()
+                        if row and row[0] > 0:
+                            print(f"Found {row[0]} records in {table_name}")
+                            tables_with_data.append(table_name)
+                        else:
+                            print(f"Table {table_name} exists but has no data")
+                    except Exception as e:
+                        # Table might not exist yet
+                        print(f"Table {table_name} not accessible: {e}")
+                        continue
+                
+                # Check if ALL critical tables have data
+                if len(tables_with_data) == len(critical_tables):
+                    print(f"All critical tables have data: {tables_with_data}")
+                    return True
+                else:
+                    missing_data = [t for t in critical_tables if t not in tables_with_data]
+                    print(f"Some critical tables missing data: {missing_data} - will sync from Airtable")
+                    return False
+                
+        except Exception as e:
+            print(f"Error checking database data: {e}")
+            # If we can't check, assume empty to trigger initial sync
+            return False
