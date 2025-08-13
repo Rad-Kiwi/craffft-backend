@@ -3,6 +3,7 @@ from typing import Optional
 from datetime import datetime
 from sqlalchemy import create_engine, Column, String, Text, DateTime, text
 from sqlalchemy.orm import declarative_base, sessionmaker
+from utilities import load_env
 
 Base = declarative_base()
 
@@ -17,8 +18,9 @@ class SQLiteStorage:
     def __init__(self, db_path: str = "data/airtable_data.db"):
         # Check if we're on Heroku (DATABASE_URL environment variable)
         database_url = os.environ.get('DATABASE_URL')
+        MODE = load_env('ENVIRONMENT_MODE')
         
-        if database_url:
+        if database_url and MODE == 'Production':
             # Heroku Postgres
             # Heroku provides postgres:// but SQLAlchemy needs postgresql://
             if database_url.startswith('postgres://'):

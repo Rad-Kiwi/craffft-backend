@@ -208,6 +208,35 @@ def update_field():
     else:
         return Response(f"Failed to update field for table: {table_name}, {column_containing_reference}: {reference_value}, column: {target_column}", status=500)
 
+@app.route("/update-student-current-step", methods=['GET'])
+def update_student_current_step():
+    # get websiteId and current-step as params
+    website_id = request.args.get("websiteId")
+    current_step = request.args.get("current-step")
+
+    if not website_id or not current_step:
+        return Response("Missing required parameters: websiteId, current-step", status=400)
+
+    manager = multi_manager.get_manager("craffft_students")
+
+    # First, verify the student exists
+    student_row = manager.get_row("website_id", website_id)
+    if not student_row:
+        return Response(f"No student found with website_id: {website_id}", status=404)
+
+    # Update the current_step field in the local database
+    success = manager.modify_field("website_id", website_id, "current_step", current_step)
+    if not success:
+        return Response(f"Failed to update current_step for student with website_id: {website_id}", status=500)
+
+    # Return success response
+    return jsonify({
+        "message": "Student current_step updated successfully",
+        "website_id": website_id,
+        "current_step": current_step,
+        "local_update": "success"
+    }), 200
+
 
 @app.route("/upload-to-airtable", methods=['POST'])
 def upload_to_airtable():
