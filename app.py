@@ -245,20 +245,52 @@ def update_student_current_step():
 @app.route("/upload-to-airtable", methods=['POST'])
 def upload_to_airtable():
     """
-    Upload all modified tables back to Airtable
+    Upload all modified tables back to Airtable, or upload a specific table if specified
     """
-    results = multi_manager.upload_modified_tables_to_airtable()
+
+    force_upload = request.args.get("force_upload", default=False, type=bool)
+    table_name = request.args.get("table_name")
+
+    # If a specific table is requested
+    if table_name:
+        # Check if the table exists
+        manager = multi_manager.get_manager(table_name)
+        if not manager:
+            return Response(f"Table '{table_name}' not found", status=404)
+        
+        # Upload the specific table
+        if force_upload:
+            # Mark as modified to ensure upload happens
+            multi_manager.mark_table_as_modified(table_name)
+        
+        result = multi_manager.upload_table_to_airtable(table_name)
+        
+        if result and not result.startswith("Error"):
+            return jsonify({
+                "message": f"Successfully uploaded table '{table_name}' to Airtable",
+                "table": table_name,
+                "result": result
+            }), 200
+        else:
+            return jsonify({
+                "message": f"Failed to upload table '{table_name}' to Airtable",
+                "table": table_name,
+                "result": result
+            }), 500
+    
+    # Otherwise, upload all modified tables (existing behavior)
+    results = multi_manager.upload_modified_tables_to_airtable(force_upload=force_upload)
     modified_tables = multi_manager.get_modified_tables()
     
-    if not modified_tables:
+    if not modified_tables and not force_upload:
         return jsonify({"message": "No tables have been modified", "results": results}), 200
     
     success_count = sum(1 for result in results.values() if result and not result.startswith("Error"))
-    total_count = len(modified_tables)
+    total_count = len(modified_tables) if not force_upload else len(results)
     
     if success_count == total_count:
         return jsonify({
-            "message": f"Successfully uploaded {success_count} modified tables to Airtable",
+            "message": f"Successfully uploaded {success_count} {'modified ' if not force_upload else ''}tables to Airtable",
             "results": results
         }), 200
     else:
