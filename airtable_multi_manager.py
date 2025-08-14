@@ -1,7 +1,7 @@
 import os
 from typing import Dict, Optional, List
 from airtable import Airtable
-from airtable_csv import AirtableCSVManager
+from table_manager import TableManager
 from sqlite_storage import SQLiteStorage
 from utilities import load_env
 import requests
@@ -9,7 +9,7 @@ import requests
 
 class AirtableMultiManager:
     """
-    Manages multiple AirtableCSVManager instances for tables within a single Airtable base.
+    Manages multiple TableManager instances for tables within a single Airtable base.
     Allows easy access to different tables by table name.
     """
     
@@ -25,7 +25,7 @@ class AirtableMultiManager:
         """
         self.api_key = api_key
         self.base_id = base_id
-        self.managers: Dict[str, AirtableCSVManager] = {}
+        self.managers: Dict[str, TableManager] = {}
         self.sqlite_storage = sqlite_storage or SQLiteStorage()  # Always use a shared storage
 
         # Default table names if none provided
@@ -38,9 +38,9 @@ class AirtableMultiManager:
         self._initialize_managers()
     
     def _initialize_managers(self):
-        """Initialize AirtableCSVManager instances for all configured tables."""
+        """Initialize TableManager instances for all configured tables."""
         for table_name in self.table_names:
-            self.managers[table_name] = AirtableCSVManager(
+            self.managers[table_name] = TableManager(
                 base_id=self.base_id,
                 table_name=table_name,
                 api_key=self.api_key,
@@ -56,22 +56,22 @@ class AirtableMultiManager:
         """
         if table_name not in self.table_names:
             self.table_names.append(table_name)
-        self.managers[table_name] = AirtableCSVManager(
+        self.managers[table_name] = TableManager(
             base_id=self.base_id,
             table_name=table_name,
             api_key=self.api_key,
             sqlite_storage=self.sqlite_storage  # Pass shared storage
         )
     
-    def get_manager(self, table_name: str) -> Optional[AirtableCSVManager]:
+    def get_manager(self, table_name: str) -> Optional[TableManager]:
         """
-        Get the AirtableCSVManager for a specific table.
+        Get the TableManager for a specific table.
         
         Args:
             table_name: Name of the table
             
         Returns:
-            AirtableCSVManager instance or None if table not found
+            TableManager instance or None if table not found
         """
         return self.managers.get(table_name)
     
@@ -264,7 +264,7 @@ class AirtableMultiManager:
     def get_value(self, table_name: str, column_containing_reference: str, reference_value: str, target_column: str):
         """
         Retrieve a value from a specific column for the row where column_containing_reference == reference_value
-        in the specified table using the relevant AirtableCSVManager.
+        in the specified table using the relevant TableManager.
 
         Args:
             table_name: Name of the table

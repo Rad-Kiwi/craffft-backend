@@ -6,7 +6,7 @@ import json
 from typing import Optional
 from sqlite_storage import SQLiteStorage
 
-class AirtableCSVManager:
+class TableManager:
     def __init__(self, base_id, table_name, api_key, sqlite_storage: Optional[SQLiteStorage] = None):
         self.base_id = base_id
         self.table_name = table_name
