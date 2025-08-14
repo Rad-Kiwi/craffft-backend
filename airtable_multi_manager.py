@@ -290,10 +290,13 @@ class AirtableMultiManager:
             return manager.execute_sql_query(sql_query)
         return None
 
-    def upload_modified_tables_to_airtable(self) -> Dict[str, str]:
+    def upload_modified_tables_to_airtable(self, force_upload: bool = False) -> Dict[str, str]:
         """
         Upload all modified tables back to Airtable.
         This will check which tables have been modified and upload their data back to Airtable.
+        
+        Args:
+            force_upload: If True, upload all tables regardless of modification status
         
         Returns:
             Dictionary with table names as keys and status messages as values
@@ -302,7 +305,7 @@ class AirtableMultiManager:
         for table_name in self.managers.keys():
             try:
                 manager = self.get_manager(table_name)
-                if manager and hasattr(manager, 'has_updates') and manager.has_updates:
+                if manager and (force_upload or (hasattr(manager, 'has_updates') and manager.has_updates)):
                     result = manager.upload_to_airtable()
                     results[table_name] = result if result else "Failed to upload"
                     # Reset the update flag after successful upload
