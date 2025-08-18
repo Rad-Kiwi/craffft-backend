@@ -210,14 +210,10 @@ class StudentDataManager:
                 - error: Error message if operation failed
         """
         try:
-            # Get student manager
+            # Get managers
             student_manager = self.airtable_multi_manager.get_manager("craffft_students")
-            if not student_manager:
-                return {
-                    "success": False,
-                    "error": "craffft_students table not found"
-                }
-            
+            step_manager = self.airtable_multi_manager.get_manager("craffft_steps")
+
             # Get current student data
             student_row = student_manager.get_row("website_id", website_id)
             if not student_row:
@@ -225,75 +221,43 @@ class StudentDataManager:
                     "success": False,
                     "error": f"No student found with website_id: {website_id}"
                 }
-            
 
+            # Get current quest and step from craffft_students 
             parsed_student = parse_database_row(student_row)
             old_current_step = parsed_student.get("current_step", "")
-            old_current_quests = parsed_student.get("current_quests", [])
+            old_current_quest = parsed_student.get("current_quest", "")
+            current_quest = old_current_quest if old_current_quest else ""
             
-            # Ensure old_current_quests is a list
-            if not isinstance(old_current_quests, list):
-                old_current_quests = [str(old_current_quests)] if old_current_quests else []
-            
-            # Determine current quest based on the step
-            current_quests = old_current_quests
-            quest_changed = False
-            
-            # Get the step details to understand which quest it belongs to
-            step_manager = self.airtable_multi_manager.get_manager("craffft_steps")
-            if not step_manager:
-                return {
-                    "success": False,
-                    "error": "craffft_steps table not found"
-                }
-                
-            step_row = step_manager.get_row("name", new_current_step)
-            if not step_row:
-                return {
-                    "success": False,
-                    "error": f"Step {new_current_step} not found in craffft_steps table"
-                }
-                
-            parsed_step = parse_database_row(step_row)
-            step_quest_id = parsed_step.get("quest", "")
-            
+            # Use get_value_by_row_and_column to look up the quest for this step
+            step_quest_id = step_manager.get_value_by_row_and_column("name", new_current_step, "craffft_quests")
             if not step_quest_id:
                 return {
                     "success": False,
-                    "error": f"No quest found for step {new_current_step}"
+                    "error": f"No quest found for step {new_current_step} in craffft_steps table"
                 }
-            
+
+            quest_changed = False
             if allow_quest_update:
                 # Update current_step and allow quest changes
                 success = student_manager.modify_field("website_id", website_id, "current_step", new_current_step)
-                if not success:
-                    return {
-                        "success": False,
-                        "error": f"Failed to update current_step for student with website_id: {website_id}"
-                    }
                 current_step = new_current_step
-                
+
                 # Check if quest needs to be updated
-                if step_quest_id not in old_current_quests:
-                    # Quest has changed, update the current_quests
-                    new_current_quests = [step_quest_id]  # Replace with new quest
-                    success = student_manager.modify_field("website_id", website_id, "current_quests", str(new_current_quests))
+                if step_quest_id != old_current_quest:
+                    # Quest has changed, update the current_quest
+                    new_current_quest = step_quest_id  # Replace with new quest (string)
+                    success = student_manager.modify_field("website_id", website_id, "current_quest", new_current_quest)
                     if success:
-                        current_quests = new_current_quests
+                        current_quest = new_current_quest
                         quest_changed = True
-                    else:
-                        print(f"Warning: Failed to update current_quests for student {website_id}")
-                else:
-                    # Quest is the same, no change needed
-                    quest_changed = False
             else:
                 # Quest update not allowed - validate that step belongs to current quest
-                if step_quest_id not in old_current_quests:
+                if step_quest_id != old_current_quest:
                     return {
                         "success": False,
-                        "error": f"Step {new_current_step} belongs to quest {step_quest_id} which is not in student's current quests {old_current_quests}. Quest updates are disabled."
+                        "error": f"Step {new_current_step} belongs to quest {step_quest_id} which is not the student's current quest {old_current_quest}. Quest updates are disabled."
                     }
-                
+
                 # Step is valid for current quest, update current_step only
                 success = student_manager.modify_field("website_id", website_id, "current_step", new_current_step)
                 if not success:
@@ -302,11 +266,7 @@ class StudentDataManager:
                         "error": f"Failed to update current_step for student with website_id: {website_id}"
                     }
                 current_step = new_current_step
-                quest_changed = False
-            
-            # Get the current quest (first one in the list, or empty string)
-            current_quest = current_quests[0] if current_quests else ""
-            
+
             return {
                 "success": True,
                 "current_step": current_step,

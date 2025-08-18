@@ -252,7 +252,7 @@ def test_update_step_and_check_quest():
     
     # Test parameters - use a known student
     website_id = "10"  # Using a test student ID that likely exists
-    test_step = "E0 -2"  # A test step ID
+    test_step = "WW -3"  # A test step ID
     
     print(f"Testing update for student website_id: {website_id} with step: {test_step}")
     
@@ -355,7 +355,8 @@ def test_update_step_and_check_quest():
     # Should fail gracefully
     assert result3["success"] is False, "Operation should fail for invalid student ID"
     assert "error" in result3, "Result should contain error message"
-    assert "not found" in result3["error"].lower(), "Error should indicate student not found"
+    print(f"Test 3 debug - Actual error: '{result3['error']}'")  # Debug output
+    assert "no student found" in result3["error"].lower(), "Error should indicate student not found"
     
     print(f"Test 3 result - Success: {result3['success']}, Error: {result3['error']}")
     
@@ -370,7 +371,7 @@ def test_update_step_and_check_quest():
     # Should fail gracefully
     assert result4["success"] is False, "Operation should fail for invalid step ID"
     assert "error" in result4, "Result should contain error message"
-    assert "not found" in result4["error"].lower(), "Error should indicate step not found"
+    assert "no quest found" in result4["error"].lower(), "Error should indicate step not found"
     
     print(f"Test 4 result - Success: {result4['success']}, Error: {result4['error']}")
     
