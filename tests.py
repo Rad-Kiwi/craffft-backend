@@ -270,6 +270,7 @@ def test_update_student_current_step_route():
         assert response.status_code == 200
         assert response.get_json().get("message") == "Student current_step updated successfully"
 
+
 def run_all_tests():
     import sys
     import types
