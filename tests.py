@@ -1,16 +1,17 @@
 import os
 from airtable_multi_manager import AirtableMultiManager
 from sqlite_storage import SQLiteStorage
-from airtable_csv import AirtableCSVManager
+from table_manager import TableManager
 from student_data_manager import StudentDataManager
 from utilities import load_env, parse_database_row
 import asyncio
+from app import app
 
 def test_basic_usage():
     multi_manager = AirtableMultiManager.from_environment()
     tables = multi_manager.get_available_tables()
     assert isinstance(tables, list)
-    table_name = "DataHub_Craffft"
+    table_name = "craffft_students"
     csv_data = multi_manager.get_csv_data(table_name)
     if csv_data:
         assert isinstance(csv_data, str)
@@ -80,37 +81,35 @@ def test_update_all_tables():
 def test_database_example():
     api_key = load_env('AIRTABLE_API_KEY')
     base_id = load_env('AIRTABLE_BASE_ID')
-    table_name = "craffft_steps"
+    table_name = "craffft_students"
     sqlite_store = SQLiteStorage()
-    manager = AirtableCSVManager(base_id, table_name, api_key, sqlite_storage=sqlite_store)
-    manager.update_csv_from_airtable()
+    manager = TableManager(base_id, table_name, api_key, sqlite_storage=sqlite_store)
     csv_data = manager.read_csv(from_db=True)
     assert csv_data is None or isinstance(csv_data, str)
 
 def test_database_columns_example():
-    api_key = load_env('AIRTABLE_API_KEY')
-    base_id = load_env('AIRTABLE_BASE_ID')
+
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
     table_name = "craffft_steps"
-    sqlite_store = SQLiteStorage()
-    manager = AirtableCSVManager(base_id, table_name, api_key, sqlite_storage=sqlite_store)
-    manager.update_csv_from_airtable()
-    column_containing_reference = "name"
-    reference_value = "Garlic Hunt"
-    target_column = "description"
-    row = manager.get_row(column_containing_reference, reference_value)
+    column_containing_reference = "last_name"
+    reference_value = "Diaz"
+    target_column = "first_name"
+
+    student_table = multi_manager.get_manager("craffft_students")
+
+    row = student_table.get_row(column_containing_reference, reference_value)
     if row:
         assert isinstance(row, dict)
-    value = manager.get_value_by_row_and_column(column_containing_reference, reference_value, target_column)
-    if value:
-        assert isinstance(value, str)
 
 def test_database_value_retrieval_multi_manager():
     multi_manager = AirtableMultiManager.from_environment()
     multi_manager.discover_and_add_tables_from_base()
-    column_containing_reference = "name"
-    reference_value = "Garlic Hunt"
-    target_column = "description"
-    value = multi_manager.get_value("craffft_steps", column_containing_reference, reference_value, target_column)
+    table_name = "craffft_students"
+    column_containing_reference = "last_name"
+    reference_value = "Diaz"
+    target_column = "first_name"
+    value = multi_manager.get_value("craffft_students", column_containing_reference, reference_value, target_column)
     if value:
         assert isinstance(value, str)
 
@@ -122,7 +121,6 @@ def test_student_data_manager():
     student_data_manager = StudentDataManager(multi_manager)
     dashboard_info = student_data_manager.get_students_data_for_dashboard(classroom_id)
 
-    print(dashboard_info)
     assert isinstance(dashboard_info, dict)
     assert 'students' in dashboard_info
     assert isinstance(dashboard_info['students'], list)
@@ -138,7 +136,6 @@ def test_student_data_manager():
 def test_sql_query():
     multi_manager = AirtableMultiManager.from_environment()
     multi_manager.discover_and_add_tables_from_base()
-    multi_manager.update_all_tables()
 
     sql = "SELECT * FROM craffft_steps WHERE name = 'Garlic Hunt'"
     sql2 = "SELECT * FROM craffft_students WHERE current_class = '1'"
@@ -151,10 +148,7 @@ def test_sql_query():
         assert results[0]['name'] == 'Garlic Hunt'
 
     print("SQL Query Test Passed")
-    print(f"Results from 'craffft_steps': {results}"
-    
-          f"\nResults from 'craffft_students': {results2}"
-    )
+
 
 def test_teacher_data():
     multi_manager = AirtableMultiManager.from_environment()
@@ -170,15 +164,13 @@ def test_teacher_data():
 def test_update_field():
     print("Running test_update_field...")
     multi_manager = AirtableMultiManager.from_environment()
-    print("Discovering and adding tables from base...")
     multi_manager.discover_and_add_tables_from_base()
 
-    print("Getting manager for table 'craffft_steps'...")
-    table_name = "craffft_steps"
-    column_containing_reference = "name"
-    reference_value = "Garlic Hunt"
-    target_column = "description"
-    new_value = "Updated description for Garlic Hunt"
+    table_name = "craffft_students"
+    column_containing_reference = "last_name"
+    reference_value = "Diaz"
+    target_column = "first_name"
+    new_value = "Updated first name for Diaz"
 
     manager = multi_manager.get_manager(table_name)
     if manager:
@@ -194,14 +186,13 @@ def test_upload_to_airtable():
     """
     multi_manager = AirtableMultiManager.from_environment()
     multi_manager.discover_and_add_tables_from_base()
-    multi_manager.update_all_tables()
     
     # Modify a field in a test table
-    table_name = "craffft_steps"
-    column_containing_reference = "name"
-    reference_value = "Garlic Hunt"
-    target_column = "description" 
-    new_value = "Test upload description - modified"
+    table_name = "craffft_students"
+    column_containing_reference = "last_name"
+    reference_value = "Diaz"
+    target_column = "first_name"
+    new_value = "Updated first name for Diaz"
     
     manager = multi_manager.get_manager(table_name)
     if manager:
@@ -410,6 +401,36 @@ def test_update_step_and_check_quest():
     
     print("✅ All update_step_and_check_quest tests passed!")
 
+def test_update_student_current_step_route():
+    """
+    Test updating a student's current_step via the API
+    """
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+
+    websiteId = "10"
+    table_name = "craffft_students"
+
+    print(f"Updating student current_step for record_id: {websiteId} in table: {table_name}")
+    manager = multi_manager.get_manager(table_name)
+
+    current_step = "EO-18"
+    success = manager.modify_field("website_id", websiteId, "current_step", current_step)
+    assert success is True
+
+    # Verify the field was actually updated
+    updated_row = manager.get_row("website_id", websiteId)
+    assert updated_row is not None
+    assert updated_row.get("current_step") == current_step
+    print(f"Field verification passed: current_step = {updated_row.get('current_step')}")
+
+
+
+    # Simulate API call
+    with app.test_client() as client:
+        response = client.get(f"/update-student-current-step?websiteId={websiteId}&current-step={current_step}")
+        assert response.status_code == 200
+        assert response.get_json().get("message") == "Student current_step updated successfully"
 
 def run_all_tests():
     import sys

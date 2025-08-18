@@ -5,8 +5,9 @@ import io
 import json
 from typing import Optional
 from sqlite_storage import SQLiteStorage
+from utilities import convert_value_for_airtable
 
-class AirtableCSVManager:
+class TableManager:
     def __init__(self, base_id, table_name, api_key, sqlite_storage: Optional[SQLiteStorage] = None):
         self.base_id = base_id
         self.table_name = table_name
@@ -107,17 +108,13 @@ class AirtableCSVManager:
 
     def upload_to_airtable(self) -> Optional[str]:
         """
-        Upload the current SQLite table data back to Airtable.
-        This will get all records from SQLite and update/create them in Airtable.
         
-        Returns:
-            Success message or None if failed
         """
         try:
             if not self.sqlite_storage:
                 return "Error: No SQLite storage configured"
             
-            # Get all records from SQLite
+            # Get all records from local database
             sql = f"SELECT * FROM \"{self.table_name}\""
             records = self.sqlite_storage.execute_sql_query(self.table_name, sql)
             
@@ -126,28 +123,26 @@ class AirtableCSVManager:
             
             airtable = Airtable(self.base_id, self.table_name, self.api_key)
             
-            # For now, we'll clear the table and re-create all records
-            # In a production system, you'd want to do a proper sync with updates/inserts/deletes
-            
-            # Get existing records to delete them
+            # Delete all existing records
             existing_records = airtable.get_all()
-            
-            # Delete existing records in batches
             if existing_records:
                 record_ids = [record['id'] for record in existing_records]
-                # Airtable allows deletion of up to 10 records at a time
                 for i in range(0, len(record_ids), 10):
                     batch = record_ids[i:i+10]
                     airtable.batch_delete(batch)
+                print(f"Deleted {len(record_ids)} existing records")
             
-            # Upload new records in batches
+            # Upload new records (smart conversion for lists and numbers)
             upload_records = []
             for record in records:
-                # Convert SQLite record to Airtable format
-                airtable_record = {'fields': record}
-                upload_records.append(airtable_record)
+                clean_record = {}
+                for k, v in record.items():
+                    converted_value = convert_value_for_airtable(v)
+                    if converted_value is not None:
+                        clean_record[k] = converted_value
+                upload_records.append(clean_record)
             
-            # Airtable allows creation of up to 10 records at a time
+            # Upload in batches
             uploaded_count = 0
             for i in range(0, len(upload_records), 10):
                 batch = upload_records[i:i+10]
@@ -155,7 +150,7 @@ class AirtableCSVManager:
                 if result:
                     uploaded_count += len(result)
             
-            return f"Successfully uploaded {uploaded_count} records to Airtable table {self.table_name}"
+            return f"Success: Replaced {self.table_name} with {uploaded_count} records"
             
         except Exception as e:
-            return f"Error uploading to Airtable: {str(e)}"
+            return f"Error: {str(e)}"

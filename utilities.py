@@ -4,6 +4,9 @@ import datetime
 import decimal
 from dotenv import load_dotenv
 
+critical_tables = ['craffft_students', 'craffft_teachers', 'craffft_quests']
+
+
 # Load environment variables once at module import time
 # Load .env first (defaults), then .env.local (overrides)
 load_dotenv('.env')
@@ -125,6 +128,60 @@ def safe_jsonify(obj, **kwargs):
             "error": f"Serialization failed: {str(e)}",
             "type": type(obj).__name__
         }, indent=2)
+
+
+def convert_value_for_airtable(value):
+    """
+    Convert a database value to the appropriate format for Airtable.
+    Detects stringified lists, numbers, and converts them appropriately.
+    
+    Args:
+        value: The value to convert
+    
+    Returns:
+        Converted value - lists as arrays, numbers as numbers, everything else as strings
+    """
+    if value is None:
+        return None
+    
+    # Handle empty strings
+    if isinstance(value, str) and not value.strip():
+        return None  # Return None for empty strings instead of empty string
+    
+    if isinstance(value, str):
+        stripped = value.strip()
+        
+        # Check if it looks like a stringified list
+        if stripped.startswith('[') and stripped.endswith(']'):
+            try:
+                import ast
+                parsed_value = ast.literal_eval(stripped)
+                if isinstance(parsed_value, (list, tuple)):
+                    return list(parsed_value)  # Convert tuples to lists
+            except (ValueError, SyntaxError):
+                pass  # If parsing fails, fall through to check for numbers
+        
+        # Check if it's a number string
+        if stripped:
+            # Try integer first
+            try:
+                return int(stripped)
+            except ValueError:
+                # Try float
+                try:
+                    return float(stripped)
+                except ValueError:
+                    pass  # Not a number, fall through to return as string
+        
+        # Return as string if not a list or number
+        return value
+    
+    # If it's already a number, keep it as is
+    if isinstance(value, (int, float)):
+        return value
+    
+    # For other types, convert to string
+    return str(value)
 
 
 def parse_database_row(row):

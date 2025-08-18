@@ -4,8 +4,8 @@ import os
 from airtable_multi_manager import AirtableMultiManager
 from student_data_manager import StudentDataManager
 import threading
-from scheduler import DailyAirtableUpdater
-from utilities import load_env, deep_jsonify, parse_database_row
+from scheduler import DailyAirtableUploader
+from utilities import load_env, deep_jsonify, parse_database_row, critical_tables
 
 app = Flask(__name__)
 CORS(app)
@@ -14,7 +14,7 @@ ENVIRONMENT_MODE = load_env('ENVIRONMENT_MODE')
 
 # --- Initialisation ---
 
-# Initialize AirtableCSVManager with environment variables
+# Initialize TableManager with environment variables
 multi_manager = AirtableMultiManager.from_environment()
 
 # Initialize StudentDataManager globally with error handling
@@ -24,24 +24,25 @@ try:
     results = multi_manager.discover_and_add_tables_from_base()
     print(f"Added tables: {results}")
     
-    # Check if we're using PostgreSQL (Heroku) or in Production mode
-    database_url = os.environ.get('DATABASE_URL')
-    if database_url or ENVIRONMENT_MODE == 'Production':
-        print("Running in Production mode or using PostgreSQL - updating all tables")
+    # Check if database has data - only update from Airtable if empty
+    database_has_data = multi_manager.sqlite_storage.has_data_in_critical_tables()
+    
+    if not database_has_data:
+        print("Database appears empty - performing initial sync from Airtable")
         results = multi_manager.update_all_tables()
-        print("All tables update results: ", results)
+        print("Initial sync results: ", results)
         
         # Check if critical tables failed
-        critical_tables = ['craffft_students', 'craffft_teachers', 'craffft_steps', 'craffft_quests']
         failed_critical = [table for table in critical_tables if table in results and 'Error' in str(results[table])]
         if failed_critical:
             print(f"Warning: Critical tables failed to update: {failed_critical}")
-        else:
-            print("All critical tables updated successfully")
+            
+    else:
+        print("Database has existing data - skipping initial sync from Airtable")
     
     # Set up StudentDataManager
     student_data_manager = StudentDataManager(multi_manager)
-    print("StudentDataManager initialized successfully")
+
 except Exception as e:
     print(f"Failed to initialize StudentDataManager: {e}")
     student_data_manager = None
@@ -63,7 +64,7 @@ def home():
 
 
 @app.route("/get-table-as-csv/<table_name>", methods=['GET'])
-def get_airtable_csv(table_name):
+def get_table_manager(table_name):
     csv_data = multi_manager.get_csv_data(table_name)
     if not csv_data:
         return Response(f"No data found for table: {table_name}", status=404)
@@ -72,11 +73,14 @@ def get_airtable_csv(table_name):
 
 @app.route("/update-server-from-airtable", methods=['GET'])
 def update_server_from_airtable():
-    success = multi_manager.update_all_tables()
-    if success:
-        return "CSV saved to /data/<your_table_name>.csv", 200
+    results = multi_manager.update_all_tables()
+    if results:
+        return jsonify({
+            "message": "All tables updated from Airtable",
+            "results": results
+        }), 200
     else:
-        return Response(f"Failed to update CSV from Airtable: {results}", status=500)
+        return Response(f"Failed to update from Airtable: {results}", status=500)
 
 
 @app.route("/get-table-as-json/<table_name>", methods=['GET'])
@@ -208,6 +212,35 @@ def update_field():
     else:
         return Response(f"Failed to update field for table: {table_name}, {column_containing_reference}: {reference_value}, column: {target_column}", status=500)
 
+@app.route("/update-student-current-step", methods=['GET'])
+def update_student_current_step():
+    # get websiteId and current-step as params
+    website_id = request.args.get("websiteId")
+    current_step = request.args.get("current-step")
+
+    if not website_id or not current_step:
+        return Response("Missing required parameters: websiteId, current-step", status=400)
+
+    manager = multi_manager.get_manager("craffft_students")
+
+    # First, verify the student exists
+    student_row = manager.get_row("website_id", website_id)
+    if not student_row:
+        return Response(f"No student found with website_id: {website_id}", status=404)
+
+    # Update the current_step field in the local database
+    success = manager.modify_field("website_id", website_id, "current_step", current_step)
+    if not success:
+        return Response(f"Failed to update current_step for student with website_id: {website_id}", status=500)
+
+    # Return success response
+    return jsonify({
+        "message": "Student current_step updated successfully",
+        "website_id": website_id,
+        "current_step": current_step,
+        "local_update": "success"
+    }), 200
+
 
 @app.route("/update-and-check-quest", methods=['GET'])
 def update_and_check_quest():
@@ -256,20 +289,52 @@ def update_and_check_quest():
 @app.route("/upload-to-airtable", methods=['POST'])
 def upload_to_airtable():
     """
-    Upload all modified tables back to Airtable
+    Upload all modified tables back to Airtable, or upload a specific table if specified
     """
-    results = multi_manager.upload_modified_tables_to_airtable()
+
+    force_upload = request.args.get("force_upload", default=False, type=bool)
+    table_name = request.args.get("table_name")
+
+    # If a specific table is requested
+    if table_name:
+        # Check if the table exists
+        manager = multi_manager.get_manager(table_name)
+        if not manager:
+            return Response(f"Table '{table_name}' not found", status=404)
+        
+        # Upload the specific table
+        if force_upload:
+            # Mark as modified to ensure upload happens
+            multi_manager.mark_table_as_modified(table_name)
+        
+        result = multi_manager.upload_table_to_airtable(table_name)
+        
+        if result and not result.startswith("Error"):
+            return jsonify({
+                "message": f"Successfully uploaded table '{table_name}' to Airtable",
+                "table": table_name,
+                "result": result
+            }), 200
+        else:
+            return jsonify({
+                "message": f"Failed to upload table '{table_name}' to Airtable",
+                "table": table_name,
+                "result": result
+            }), 500
+    
+    # Otherwise, upload all modified tables (existing behavior)
+    results = multi_manager.upload_modified_tables_to_airtable(force_upload=force_upload)
     modified_tables = multi_manager.get_modified_tables()
     
-    if not modified_tables:
+    if not modified_tables and not force_upload:
         return jsonify({"message": "No tables have been modified", "results": results}), 200
     
     success_count = sum(1 for result in results.values() if result and not result.startswith("Error"))
-    total_count = len(modified_tables)
+    total_count = len(modified_tables) if not force_upload else len(results)
     
     if success_count == total_count:
         return jsonify({
-            "message": f"Successfully uploaded {success_count} modified tables to Airtable",
+            "message": f"Successfully uploaded {success_count} {'modified ' if not force_upload else ''}tables to Airtable",
             "results": results
         }), 200
     else:
@@ -297,13 +362,13 @@ def get_modified_tables():
 
 if __name__ == '__main__':
     # Start the scheduler if in production mode
-    if ENVIRONMENT_MODE == 'Production' and student_data_manager:
+    if ENVIRONMENT_MODE == 'Production': 
         print("Starting scheduler for Production mode")
         
         # Start the scheduler in a background thread
         def start_scheduler():
-            updater = DailyAirtableUpdater()
-            updater.run_daily("00:00")  # Set desired time
+            uploader = DailyAirtableUploader()
+            uploader.run_daily("00:00")  # Set desired time
 
         scheduler_thread = threading.Thread(target=start_scheduler, daemon=True)
         scheduler_thread.start()
