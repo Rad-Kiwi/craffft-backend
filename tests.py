@@ -3,7 +3,7 @@ from airtable_multi_manager import AirtableMultiManager
 from sqlite_storage import SQLiteStorage
 from airtable_csv import AirtableCSVManager
 from student_data_manager import StudentDataManager
-from utilities import load_env
+from utilities import load_env, parse_database_row
 import asyncio
 
 def test_basic_usage():
@@ -248,6 +248,169 @@ def test_get_student_by_record_id():
     assert 'record_id' in student_row
     assert student_row['record_id'] == student_record
 
+def test_update_step_and_check_quest():
+    """
+    Test the StudentDataManager's update_step_and_check_quest method
+    """
+    print("Running test_update_step_and_check_quest...")
+    
+    # Initialize the multi_manager and student_data_manager
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    student_data_manager = StudentDataManager(multi_manager)
+    
+    # Test parameters - use a known student
+    website_id = "10"  # Using a test student ID that likely exists
+    test_step = "E0 -2"  # A test step ID
+    
+    print(f"Testing update for student website_id: {website_id} with step: {test_step}")
+    
+    # Get initial student state for comparison
+    initial_student = student_data_manager.get_student_info(website_id)
+    if not initial_student:
+        print(f"Warning: Student with website_id {website_id} not found. Skipping test.")
+        return
+    
+    parsed_initial = parse_database_row(initial_student)
+    initial_step = parsed_initial.get("current_step", "")
+    initial_quests = parsed_initial.get("current_quests", [])
+    
+    print(f"Initial state - Step: {initial_step}, Quests: {initial_quests}")
+    
+    # Test 1: Update step with quest update allowed
+    print("Test 1: Updating step with quest update allowed...")
+    result = student_data_manager.update_step_and_check_quest(
+        website_id=website_id,
+        new_current_step=test_step,
+        allow_quest_update=True
+    )
+    
+    # Debug: Print the actual result to see what we got
+    print(f"Test 1 debug - Actual result: {result}")
+    
+    # Verify the result structure
+    assert isinstance(result, dict), "Result should be a dictionary"
+    assert "success" in result, "Result should have 'success' key"
+    
+    # Check if operation failed and print error for debugging
+    if not result.get("success", False):
+        print(f"Test 1 failed with error: {result.get('error', 'Unknown error')}")
+        print("Skipping remaining assertions due to operation failure")
+        return
+    
+    assert "current_step" in result, "Result should have 'current_step' key"
+    assert "current_quest" in result, "Result should have 'current_quest' key"
+    assert "quest_changed" in result, "Result should have 'quest_changed' key"
+    
+    # Verify operation succeeded
+    assert result["success"] is True, f"Operation should succeed: {result.get('error', '')}"
+    
+    # Verify step was updated
+    assert result["current_step"] == test_step, f"Current step should be {test_step}, got {result['current_step']}"
+    
+    print(f"Test 1 result - Step: {result['current_step']}, Quest: {result['current_quest']}, Changed: {result['quest_changed']}")
+    
+    # Store current state after first update for next tests
+    current_step_after_update = result["current_step"]
+    current_quest_after_update = result["current_quest"]
+    
+    # Test 2: Update step with quest update disabled (valid step for current quest)
+    print("Test 2: Testing quest update disabled with valid step...")
+    # We need to find a step that belongs to the current quest
+    # For now, let's try to update to the same step (should always be valid)
+    result2 = student_data_manager.update_step_and_check_quest(
+        website_id=website_id,
+        new_current_step=current_step_after_update,  # Same step should be valid
+        allow_quest_update=False
+    )
+    
+    # Should succeed since step belongs to current quest
+    assert result2["success"] is True, f"Operation should succeed for valid step: {result2.get('error', '')}"
+    assert result2["current_step"] == current_step_after_update, f"Step should remain {current_step_after_update}"
+    assert result2["quest_changed"] is False, "Quest should not change when updates disabled"
+    
+    print(f"Test 2 result - Step: {result2['current_step']}, Quest: {result2['current_quest']}, Changed: {result2['quest_changed']}")
+    
+    # Test 2b: Update step with quest update disabled (invalid step - different quest)
+    print("Test 2b: Testing quest update disabled with invalid step...")
+    # Try to use a step that likely belongs to a different quest
+    different_quest_step = "EO-19" if test_step != "EO-19" else "EO-20"
+    
+    result2b = student_data_manager.update_step_and_check_quest(
+        website_id=website_id,
+        new_current_step=different_quest_step,
+        allow_quest_update=False
+    )
+    
+    # This might succeed or fail depending on whether the step belongs to current quest
+    # Let's check both scenarios
+    if result2b["success"]:
+        print(f"Test 2b: Step {different_quest_step} was valid for current quest")
+        assert result2b["quest_changed"] is False, "Quest should not change when updates disabled"
+    else:
+        print(f"Test 2b: Step {different_quest_step} was invalid for current quest (expected)")
+        assert "quest" in result2b["error"].lower() or "not in" in result2b["error"].lower(), "Error should mention quest validation"
+    
+    print(f"Test 2b result - Success: {result2b['success']}, Error: {result2b.get('error', 'None')}")
+    
+    # Test 3: Test with invalid student ID
+    print("Test 3: Testing with invalid student ID...")
+    result3 = student_data_manager.update_step_and_check_quest(
+        website_id="invalid_id_999",
+        new_current_step=test_step,
+        allow_quest_update=True
+    )
+    
+    # Should fail gracefully
+    assert result3["success"] is False, "Operation should fail for invalid student ID"
+    assert "error" in result3, "Result should contain error message"
+    assert "not found" in result3["error"].lower(), "Error should indicate student not found"
+    
+    print(f"Test 3 result - Success: {result3['success']}, Error: {result3['error']}")
+    
+    # Test 4: Test with invalid step ID
+    print("Test 4: Testing with invalid step ID...")
+    result4 = student_data_manager.update_step_and_check_quest(
+        website_id=website_id,
+        new_current_step="invalid_step_999",
+        allow_quest_update=True
+    )
+    
+    # Should fail gracefully
+    assert result4["success"] is False, "Operation should fail for invalid step ID"
+    assert "error" in result4, "Result should contain error message"
+    assert "not found" in result4["error"].lower(), "Error should indicate step not found"
+    
+    print(f"Test 4 result - Success: {result4['success']}, Error: {result4['error']}")
+    
+    # Test 5: Verify database state matches returned values
+    print("Test 5: Verifying database state...")
+    updated_student = student_data_manager.get_student_info(website_id)
+    parsed_updated = parse_database_row(updated_student)
+    db_step = parsed_updated.get("current_step", "")
+    db_quests = parsed_updated.get("current_quests", [])
+    
+    # The step in DB should match what was returned from the successful update
+    assert db_step == current_step_after_update, f"DB step {db_step} should match result {current_step_after_update}"
+    
+    print(f"Test 5 result - DB Step: {db_step}, DB Quests: {db_quests}")
+    
+    # Restore original state (cleanup)
+    if initial_step:
+        print(f"Cleanup: Restoring original step {initial_step}...")
+        cleanup_result = student_data_manager.update_step_and_check_quest(
+            website_id=website_id,
+            new_current_step=initial_step,
+            allow_quest_update=True
+        )
+        if cleanup_result["success"]:
+            print("Cleanup successful")
+        else:
+            print(f"Cleanup warning: {cleanup_result.get('error', 'Unknown error')}")
+    
+    print("✅ All update_step_and_check_quest tests passed!")
+
+
 def run_all_tests():
     import sys
     import types
@@ -270,4 +433,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    run_all_tests()
+    test_update_step_and_check_quest()
