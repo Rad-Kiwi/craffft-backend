@@ -242,6 +242,50 @@ def update_student_current_step():
     }), 200
 
 
+@app.route("/update-and-check-quest", methods=['GET'])
+def update_and_check_quest():
+    """
+    Update student's current step and check if quest changed
+    
+    Params:
+        websiteId (required): Student's website ID
+        current-step (required): New current step
+        allow-quest-update (optional): Whether to update quest, defaults to true
+    
+    Returns:
+        current_step: Student's current step
+        current_quest: Student's current quest
+        quest_changed: Boolean indicating if quest changed
+    """
+    # Get parameters
+    website_id = request.args.get("websiteId")
+    new_current_step = request.args.get("current-step")
+    allow_quest_update = request.args.get("allow-quest-update", "true").lower() == "true"
+    
+    if not website_id or not new_current_step:
+        return Response("Missing required parameters: websiteId, current-step", status=400)
+    
+    if not student_data_manager:
+        return Response("StudentDataManager not found", status=500)
+    
+    # Use the StudentDataManager to handle the business logic
+    result = student_data_manager.update_step_and_check_quest(
+        website_id=website_id,
+        new_current_step=new_current_step,
+        allow_quest_update=allow_quest_update
+    )
+    
+    if not result["success"]:
+        return Response(result["error"], status=400)
+    
+    # Return the successful response
+    return jsonify({
+        "current_step": result["current_step"],
+        "current_quest": result["current_quest"],
+        "quest_changed": result["quest_changed"]
+    })
+
+
 @app.route("/upload-to-airtable", methods=['POST'])
 def upload_to_airtable():
     """
@@ -311,6 +355,8 @@ def get_modified_tables():
         "modified_tables": modified_tables,
         "count": len(modified_tables)
     })
+
+
 
 # --- Scheduler Initialisation ---
 
