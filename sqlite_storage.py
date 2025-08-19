@@ -189,6 +189,70 @@ class SQLiteStorage:
             )
             return result.rowcount > 0
 
+    def add_record(self, table_name: str, record_data: dict) -> bool:
+        """
+        Add a new record to the specified table.
+        Creates table if it doesn't exist and adds missing columns if they don't exist.
+        
+        Args:
+            table_name: Name of the table to insert into
+            record_data: Dictionary containing the record data to insert
+            
+        Returns:
+            bool: True if record was added successfully, False otherwise
+        """
+        try:
+            if not record_data:
+                return False
+                
+            fieldnames = list(record_data.keys())
+            
+            # Check for special characters in column names
+            import re
+            special_char_pattern = re.compile(r'[^a-zA-Z0-9_]')
+            for col in fieldnames:
+                if special_char_pattern.search(col):
+                    print(f"Warning: Column name '{col}' in table '{table_name}' contains special characters. This may cause issues with SQLite.")
+            
+            with self.engine.begin() as conn:
+                # Check if table exists
+                table_exists_result = conn.execute(
+                    text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table_name"),
+                    {"table_name": table_name}
+                )
+                table_exists = table_exists_result.fetchone() is not None
+                
+                if not table_exists:
+                    # Create table if it doesn't exist
+                    columns_sql = ', '.join([f'"{col}" TEXT' for col in fieldnames])
+                    conn.execute(
+                        text(f'CREATE TABLE IF NOT EXISTS "{table_name}" ({columns_sql})')
+                    )
+                else:
+                    # Table exists, check for missing columns and add them
+                    existing_columns_result = conn.execute(text(f'PRAGMA table_info("{table_name}")'))
+                    existing_columns = {row[1] for row in existing_columns_result.fetchall()}  # row[1] is column name
+                    
+                    missing_columns = set(fieldnames) - existing_columns
+                    for col in missing_columns:
+                        print(f"Adding missing column '{col}' to table '{table_name}'")
+                        conn.execute(text(f'ALTER TABLE "{table_name}" ADD COLUMN "{col}" TEXT'))
+                
+                # Insert the new record
+                placeholders = ', '.join([f':{col}' for col in fieldnames])
+                quoted_fieldnames = ', '.join([f'"{col}"' for col in fieldnames])
+                insert_sql = text(f'INSERT INTO "{table_name}" ({quoted_fieldnames}) VALUES ({placeholders})')
+                
+                # Ensure all keys exist (fill missing with empty string)
+                row_dict = {col: record_data.get(col, '') for col in fieldnames}
+                result = conn.execute(insert_sql, row_dict)
+                
+                return result.rowcount > 0
+                
+        except Exception as e:
+            print(f"Error adding record to {table_name}: {e}")
+            return False
+
     def has_data_in_critical_tables(self) -> bool:
         """
         Check if ALL critical tables have data.

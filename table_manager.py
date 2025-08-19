@@ -154,3 +154,44 @@ class TableManager:
             
         except Exception as e:
             return f"Error: {str(e)}"
+
+    def add_record(self, record_data: dict) -> bool:
+        """
+        Add a new record to the table.
+        
+        Args:
+            record_data: Dictionary containing the record data to insert
+            
+        Returns:
+            True if record was added successfully, False otherwise
+        """
+        if not self.sqlite_storage:
+            return False
+            
+        try:
+            # Insert the record into SQLite
+            success = self.sqlite_storage.add_record(self.table_name, record_data)
+            
+            if success:
+                self.has_updates = True
+                
+            return success
+            
+        except Exception as e:
+            print(f"Error adding record to {self.table_name}: {e}")
+            return False
+
+    def get_full_table(self):
+        """
+        Get all records from the table as a list of dictionaries
+        """
+        if not self.sqlite_storage:
+            return None
+            
+        try:
+            sql = f"SELECT * FROM \"{self.table_name}\""
+            records = self.sqlite_storage.execute_sql_query(self.table_name, sql)
+            return records if records else []
+        except Exception as e:
+            print(f"Error getting full table {self.table_name}: {e}")
+            return []

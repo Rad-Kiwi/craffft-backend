@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request, Response, render_template, send_from_directory
 from flask_cors import CORS
 import os
 from airtable_multi_manager import AirtableMultiManager
@@ -6,6 +6,7 @@ from student_data_manager import StudentDataManager
 import threading
 from scheduler import DailyAirtableUploader
 from utilities import load_env, deep_jsonify, parse_database_row, critical_tables
+from quest_routes import quest_bp
 
 app = Flask(__name__)
 CORS(app)
@@ -47,6 +48,12 @@ except Exception as e:
     print(f"Failed to initialize StudentDataManager: {e}")
     student_data_manager = None
 
+# Store multi_manager in app config for use in blueprints
+app.config['multi_manager'] = multi_manager
+
+# Register quest routes blueprint
+app.register_blueprint(quest_bp)
+
 
 def deep_jsonify_response(obj):
     """
@@ -60,7 +67,15 @@ def deep_jsonify_response(obj):
 
 @app.route("/")
 def home():
-    return "Up and running! View routes at: https://github.com/radkiwi/craffft-backend"
+    return """
+    <h1>Craffft Backend - Up and running!</h1>
+    <p><a href="https://github.com/radkiwi/craffft-backend">View all routes on GitHub</a></p>
+    <h2>Tools:</h2>
+    <ul>
+        <li><a href="/quest-generator">🎮 Quest Generator</a> - Create new quests and steps</li>
+        <li><a href="/quest-browser">📖 Quest Browser</a> - View all created quests and steps</li>
+    </ul>
+    """
 
 
 @app.route("/get-table-as-csv/<table_name>", methods=['GET'])
@@ -355,7 +370,6 @@ def get_modified_tables():
         "modified_tables": modified_tables,
         "count": len(modified_tables)
     })
-
 
 
 # --- Scheduler Initialisation ---
