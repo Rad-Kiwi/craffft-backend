@@ -1,0 +1,160 @@
+body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+
+.container {
+    background-color: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+h1 {
+    color: #2c3e50;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #34495e;
+}
+
+input, textarea, select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+textarea {
+    height: 100px;
+    resize: vertical;
+}
+
+.curriculum-textarea {
+    height: 150px;
+}
+
+button {
+    background-color: #3498db;
+    color: white;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    width: 100%;
+    margin-top: 20px;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+.help-text {
+    font-size: 12px;
+    color: #7f8c8d;
+    margin-top: 5px;
+}
+
+.section-header {
+    background-color: #ecf0f1;
+    padding: 10px;
+    margin: 20px 0 10px 0;
+    border-radius: 5px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.steps-container {
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+.step-input {
+    margin-bottom: 15px;
+    padding: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    background-color: #fafafa;
+}
+
+.step-input h4 {
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+    font-size: 16px;
+}
+
+.step-input textarea {
+    height: 80px;
+    margin-bottom: 10px;
+}
+
+.add-step-btn {
+    background-color: #27ae60;
+    width: auto;
+    padding: 8px 20px;
+    margin: 10px 0;
+}
+
+.add-step-btn:hover {
+    background-color: #219a52;
+}
+
+.remove-step-btn {
+    background-color: #e74c3c;
+    width: auto;
+    padding: 5px 10px;
+    margin-left: 10px;
+    font-size: 12px;
+}
+
+.remove-step-btn:hover {
+    background-color: #c0392b;
+}
+
+#result {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 5px;
+    display: none;
+}
+
+.success {
+    background-color: #d5f4e6;
+    border: 1px solid #27ae60;
+    color: #27ae60;
+}
+
+.error {
+    background-color: #fadbd8;
+    border: 1px solid #e74c3c;
+    color: #e74c3c;
+}
+
+.nav-link {
+    display: inline-block;
+    margin-bottom: 20px;
+    color: #3498db;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.nav-link:hover {
+    text-decoration: underline;
+}

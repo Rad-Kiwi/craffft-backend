@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quest Browser - Craffft Backend</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/quest_browser.css') }}">
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="nav-link">← Back to Home</a>
+        <a href="/quest-generator" class="nav-link">Create New Quest</a>
+        
+        <h1>🎮 Quest Browser</h1>
+        
+        <input type="text" id="searchBox" class="search-box" placeholder="Search quests by name, short code, or steps...">
+        
+        <div id="loading" class="loading">Loading quests...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="questsList"></div>
+    </div>
+
+    <script>
+        let allQuests = [];
+        let allSteps = [];
+
+        async function loadQuests() {
+            try {
+                // Load both quests and steps data separately
+                const [questsResponse, stepsResponse] = await Promise.all([
+                    fetch('/api/quests'),
+                    fetch('/api/steps')
+                ]);
+
+                if (!questsResponse.ok) {
+                    throw new Error('Failed to load quest data');
+                }
+                if (!stepsResponse.ok) {
+                    throw new Error('Failed to load steps data');
+                }
+
+                allQuests = await questsResponse.json();
+                allSteps = await stepsResponse.json();
+
+                document.getElementById('loading').style.display = 'none';
+                displayQuests(allQuests);
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'Error loading data: ' + error.message;
+            }
+        }
+
+        function getStepsForQuest(questId) {
+            // Find all steps that belong to this quest
+            return allSteps.filter(step => step.quest_id === questId || step.record_id === questId);
+        }
+
+        async function fetchStepDetails(stepName, questCard) {
+            try {
+                const response = await fetch(`/api/steps/${encodeURIComponent(stepName)}`);
+                if (response.ok) {
+                    const stepData = await response.json();
+                    displayStepDetails(stepData, questCard);
+                } else {
+                    displayStepDetails(null, questCard, `Step "${stepName}" not found in database`);
+                }
+            } catch (error) {
+                displayStepDetails(null, questCard, `Error fetching step details: ${error.message}`);
+            }
+        }
+
+        function displayStepDetails(stepData, questCard, errorMessage = null) {
+            // Remove any existing step details
+            const existingDetails = questCard.querySelector('.step-details');
+            if (existingDetails) {
+                existingDetails.remove();
+            }
+
+            const detailsDiv = document.createElement('div');
+            detailsDiv.className = 'step-details show';
+
+            if (errorMessage) {
+                detailsDiv.innerHTML = `
+                    <div class="step-detail-header">❌ ${errorMessage}</div>
+                `;
+            } else if (stepData) {
+                detailsDiv.innerHTML = `
+                    <div class="step-detail-header">📝 Step Details: ${stepData.name || 'Unknown Step'}</div>
+                    <div class="step-detail-item">
+                        <span class="step-detail-label">Step Name:</span>
+                        ${stepData.name || 'Not specified'}
+                    </div>
+                    <div class="step-detail-item">
+                        <span class="step-detail-label">Record ID:</span>
+                        ${stepData.record_id || 'Not specified'}
+                    </div>
+                    <div class="step-detail-item">
+                        <span class="step-detail-label">Craffft Curriculum Alignment:</span>
+                        ${stepData.craffft_curriculum_alignment || 'Not specified'}
+                    </div>
+                    <div class="step-detail-item">
+                        <span class="step-detail-label">Location:</span>
+                        <span class="step-location ${(stepData.location || '').toLowerCase().replace(/\s+/g, '_')}">${formatLocation(stepData.location)}</span>
+                    </div>
+                    <div class="step-detail-item">
+                        <span class="step-detail-label">Description:</span>
+                        <div style="margin-top: 5px; padding: 10px; background-color: white; border-radius: 3px; border: 1px solid #ddd;">
+                            ${stepData.description || 'No description available'}
+                        </div>
+                    </div>
+                    ${stepData.description_curriculum_alignment ? `
+                        <div class="step-detail-item">
+                            <span class="step-detail-label">Description Curriculum Alignment:</span>
+                            <div style="margin-top: 5px; padding: 10px; background-color: white; border-radius: 3px; border: 1px solid #ddd; font-size: 12px; white-space: pre-wrap;">
+                                ${stepData.description_curriculum_alignment}
+                            </div>
+                        </div>
+                    ` : ''}
+                `;
+            }
+
+            questCard.appendChild(detailsDiv);
+        }
+
+        function getStepCount(quest) {
+            // First try num_steps field
+            if (quest.num_steps && !isNaN(quest.num_steps)) {
+                return parseInt(quest.num_steps);
+            }
+            
+            // Fallback to parsing steps array if it exists
+            if (quest.steps) {
+                try {
+                    let steps = quest.steps;
+                    if (typeof steps === 'string') {
+                        // Handle Python-style list format like "['E0 -1', 'E0 -3', 'E0 -2']"
+                        if (steps.startsWith('[') && steps.endsWith(']')) {
+                            // Convert Python list format to JSON format
+                            steps = steps.replace(/'/g, '"');
+                            steps = JSON.parse(steps);
+                        } else {
+                            // Try regular JSON parsing
+                            steps = JSON.parse(steps);
+                        }
+                    }
+                    if (Array.isArray(steps)) {
+                        return steps.length;
+                    }
+                } catch (e) {
+                    // If JSON parsing fails, try to parse Python-style list manually
+                    try {
+                        let stepsStr = quest.steps.trim();
+                        if (stepsStr.startsWith('[') && stepsStr.endsWith(']')) {
+                            // Remove brackets and split by comma, then clean up quotes
+                            stepsStr = stepsStr.slice(1, -1);
+                            const stepsArray = stepsStr.split(',').map(step => 
+                                step.trim().replace(/^['"]|['"]$/g, '')
+                            ).filter(step => step.length > 0);
+                            return stepsArray.length;
+                        }
+                    } catch (e2) {
+                        // If all parsing fails, return 0
+                        return 0;
+                    }
+                }
+            }
+            
+            return 0;
+        }
+
+        function displayQuests(quests) {
+            const questsList = document.getElementById('questsList');
+            
+            if (quests.length === 0) {
+                questsList.innerHTML = '<div class="no-quests">No quests found. <a href="/quest-generator">Create your first quest</a>!</div>';
+                return;
+            }
+
+            questsList.innerHTML = quests.map(quest => {
+                const stepCount = getStepCount(quest);
+                const relatedSteps = getStepsForQuest(quest.record_id);
+                let stepsArray = [];
+                
+                // Parse quest's embedded steps array for display
+                if (quest.steps) {
+                    try {
+                        let steps = quest.steps;
+                        if (typeof steps === 'string') {
+                            // Handle Python-style list format like "['E0 -1', 'E0 -3', 'E0 -2']"
+                            if (steps.startsWith('[') && steps.endsWith(']')) {
+                                // Convert Python list format to JSON format
+                                steps = steps.replace(/'/g, '"');
+                                steps = JSON.parse(steps);
+                            } else {
+                                // Try regular JSON parsing
+                                steps = JSON.parse(steps);
+                            }
+                        }
+                        if (Array.isArray(steps)) {
+                            stepsArray = steps;
+                        }
+                    } catch (e) {
+                        // If JSON parsing fails, try to parse Python-style list manually
+                        try {
+                            let stepsStr = quest.steps.trim();
+                            if (stepsStr.startsWith('[') && stepsStr.endsWith(']')) {
+                                // Remove brackets and split by comma, then clean up quotes
+                                stepsStr = stepsStr.slice(1, -1);
+                                stepsArray = stepsStr.split(',').map(step => 
+                                    step.trim().replace(/^['"]|['"]$/g, '')
+                                ).filter(step => step.length > 0);
+                            } else {
+                                stepsArray = [quest.steps];
+                            }
+                        } catch (e2) {
+                            // Final fallback - show raw value
+                            stepsArray = [quest.steps];
+                        }
+                    }
+                }
+                
+                return `
+                    <div class="quest-card">
+                        <div class="quest-header">
+                            <h2 class="quest-title">${quest.quest_name || 'Untitled Quest'}</h2>
+                            <span class="quest-prefix">${quest.step_short_code || 'N/A'}</span>
+                        </div>
+                        
+                        <div class="quest-info">
+                            <div>
+                                <div class="info-item">
+                                    <span class="info-label">Quest Name:</span>
+                                    <div class="info-value">${quest.quest_name || 'Not specified'}</div>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Step Short Code:</span>
+                                    <div class="info-value">${quest.step_short_code || 'Not specified'}</div>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Number of Steps:</span>
+                                    <div class="info-value">${stepCount}</div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="info-item">
+                                    <span class="info-label">Record ID:</span>
+                                    <div class="info-value">${quest.record_id || 'Not specified'}</div>
+                                </div>
+                                ${quest.quest_image ? `
+                                    <div class="info-item">
+                                        <span class="info-label">Quest Image:</span>
+                                        <div class="info-value">
+                                            <img src="${quest.quest_image}" alt="Quest Image" style="max-width: 200px; max-height: 150px; border-radius: 5px; object-fit: cover;">
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+
+                        ${quest.quest_description ? `
+                            <div class="quest-description">
+                                <span class="info-label">Quest Description:</span>
+                                <div style="margin-top: 5px; padding: 10px; background-color: white; border-radius: 3px; border: 1px solid #ddd;">
+                                    ${quest.quest_description}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <div class="steps-section">
+                            <div class="steps-header">
+                                Quest Steps Array (${stepsArray.length}) - Click a step to see details
+                            </div>
+                            ${stepsArray.length > 0 ? `
+                                <div class="step-buttons-container">
+                                    ${stepsArray.map((step, index) => `
+                                        <button class="step-button" onclick="handleStepClick('${step.replace(/'/g, "\\'")}', this)">
+                                            ${step}
+                                        </button>
+                                    `).join('')}
+                                </div>
+                            ` : '<div style="color: #7f8c8d; font-style: italic;">No embedded steps found for this quest</div>'}
+                        </div>
+
+                        ${relatedSteps.length > 0 ? `
+                            <div class="steps-section">
+                                <div class="steps-header">
+                                    Separate Steps Records (${relatedSteps.length})
+                                </div>
+                                ${relatedSteps.map((step, index) => `
+                                    <div class="step-item">
+                                        <div class="step-header">
+                                            <span class="step-code">${step.name || `Step ${index + 1}`}</span>
+                                            <span class="step-location ${(step.location || '').toLowerCase().replace(/\s+/g, '_')}">${formatLocation(step.location)}</span>
+                                        </div>
+                                        <div class="step-description">
+                                            <strong>Record ID:</strong> ${step.record_id || 'Not specified'}<br>
+                                            <strong>Craffft Curriculum Alignment:</strong> ${step.craffft_curriculum_alignment || 'Not specified'}<br>
+                                            <strong>Description:</strong> ${step.description || 'No description available'}
+                                        </div>
+                                        ${step.description_curriculum_alignment ? `
+                                            <div style="margin-top: 8px; font-size: 12px; color: #7f8c8d;">
+                                                <strong>Description Curriculum Alignment:</strong> ${step.description_curriculum_alignment}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : '<div style="color: #7f8c8d; font-style: italic; margin-top: 15px;">No separate step records found for this quest</div>'}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function handleStepClick(stepName, buttonElement) {
+            // Remove active class from all step buttons in this quest card
+            const questCard = buttonElement.closest('.quest-card');
+            const allButtons = questCard.querySelectorAll('.step-button');
+            allButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Add active class to clicked button
+            buttonElement.classList.add('active');
+            
+            // Fetch and display step details
+            fetchStepDetails(stepName, questCard);
+        }
+
+        function formatLocation(location) {
+            switch(location) {
+                case 'in_game': return 'In Game';
+                case 'irl': return 'IRL';
+                case 'on_portal': return 'On Portal';
+                default: return location || 'Unknown';
+            }
+        }
+
+        function searchQuests(searchTerm) {
+            if (!searchTerm.trim()) {
+                displayQuests(allQuests);
+                return;
+            }
+
+            const filteredQuests = allQuests.filter(quest => {
+                const searchLower = searchTerm.toLowerCase();
+                
+                // Search in quest fields
+                const questMatches = (quest.quest_name && quest.quest_name.toLowerCase().includes(searchLower)) ||
+                                   (quest.step_short_code && quest.step_short_code.toLowerCase().includes(searchLower)) ||
+                                   (quest.steps && quest.steps.toString().toLowerCase().includes(searchLower));
+                
+                // Search in related steps
+                const relatedSteps = getStepsForQuest(quest.record_id);
+                const stepMatches = relatedSteps.some(step => 
+                    (step.name && step.name.toLowerCase().includes(searchLower)) ||
+                    (step.description && step.description.toLowerCase().includes(searchLower)) ||
+                    (step.location && step.location.toLowerCase().includes(searchLower)) ||
+                    (step.craffft_curriculum_alignment && step.craffft_curriculum_alignment.toLowerCase().includes(searchLower)) ||
+                    (step.quest && step.quest.toLowerCase().includes(searchLower)) ||
+                    (step.quest_name && step.quest_name.toLowerCase().includes(searchLower)) ||
+                    (step.description_curriculum_alignment && step.description_curriculum_alignment.toLowerCase().includes(searchLower)) ||
+                    (step.short_description && step.short_description.toLowerCase().includes(searchLower))
+                );
+                
+                return questMatches || stepMatches;
+            });
+
+            displayQuests(filteredQuests);
+        }
+
+        // Search functionality
+        document.getElementById('searchBox').addEventListener('input', function() {
+            searchQuests(this.value);
+        });
+
+        // Load quests when page loads
+        loadQuests();
+    </script>
+</body>
+</html>

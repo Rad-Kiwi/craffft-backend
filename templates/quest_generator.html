@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quest Generator - Craffft Backend</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/quest_generator.css') }}">
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="nav-link">← Back to Home</a>
+        <h1>🎮 Quest Generator</h1>
+        
+        <form id="questForm">
+            <div class="section-header">Basic Quest Information</div>
+            
+            <div class="form-group">
+                <label for="quest_name">Quest Name *</label>
+                <input type="text" id="quest_name" name="quest_name" required>
+                <div class="help-text">Example: Garlic Hunt, Supply and Demand</div>
+            </div>
+
+            <div class="form-group">
+                <label for="quest_prefix">Quest Prefix *</label>
+                <input type="text" id="quest_prefix" name="quest_prefix" required placeholder="GG, EO, WW">
+                <div class="help-text">Short prefix for generating step codes (e.g., GG, E0, WW)</div>
+            </div>
+
+            <div class="form-group">
+                <label for="quest_image">Quest Image URL (Optional)</label>
+                <input type="url" id="quest_image" name="quest_image" placeholder="https://example.com/image.jpg">
+                <div class="help-text">Enter a permanent URL for the quest image</div>
+            </div>
+
+            <div class="section-header">Quest Content</div>
+
+            <div class="form-group">
+                <label for="quest_description">Quest Description *</label>
+                <textarea id="quest_description" name="quest_description" required placeholder="During this quest the student does A B and C"></textarea>
+                <div class="help-text">Describe what the student will do in this quest</div>
+            </div>
+
+            <div class="section-header">Quest Steps</div>
+            
+            <div class="form-group">
+                <label>Quest Steps</label>
+                <div class="steps-container">
+                    <div id="steps-list">
+                        <!-- Steps will be added here dynamically -->
+                    </div>
+                    <button type="button" class="add-step-btn" onclick="addStep()">+ Add Step</button>
+                    <div class="help-text">Add steps for this quest. Each step will get an auto-generated short code (prefix-1, prefix-2, etc.)</div>
+                </div>
+            </div>
+
+            <div class="section-header">Optional Fields</div>
+
+            <div class="form-group">
+                <label for="record_id">Quest Record ID (Optional)</label>
+                <input type="text" id="record_id" name="record_id">
+                <div class="help-text">Leave empty to auto-generate</div>
+            </div>
+
+            <button type="submit">🚀 Generate Quest & Steps</button>
+        </form>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let stepCounter = 0;
+
+        function addStep() {
+            stepCounter++;
+            const stepsList = document.getElementById('steps-list');
+            const stepDiv = document.createElement('div');
+            stepDiv.className = 'step-input';
+            stepDiv.innerHTML = `
+                <h4>Step ${stepCounter}</h4>
+                <div style="margin-bottom: 10px;">
+                    <label>Craffft Curriculum Alignment *</label>
+                    <input type="text" name="step_curriculum_alignments[]" placeholder="level 1:Mathematics and Statistics:Number and algebra" required style="margin-bottom: 10px;">
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <label>Location *</label>
+                    <select name="step_locations[]" required style="margin-bottom: 10px;">
+                        <option value="">Select location...</option>
+                        <option value="in_game">In Game</option>
+                        <option value="irl">IRL (In Real Life)</option>
+                        <option value="on_portal">On Portal</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <label>Description *</label>
+                    <textarea name="step_descriptions[]" placeholder="Enter description for this step..." required></textarea>
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <label>Description Curriculum Alignment (Optional)</label>
+                    <textarea name="step_description_curriculum_alignments[]" placeholder="Detailed curriculum alignment information..." style="height: 100px;"></textarea>
+                </div>
+                <button type="button" class="remove-step-btn" onclick="removeStep(this)">Remove Step</button>
+            `;
+            stepsList.appendChild(stepDiv);
+            updateStepNumbers();
+        }
+
+        function removeStep(button) {
+            button.parentElement.remove();
+            updateStepNumbers();
+        }
+
+        function updateStepNumbers() {
+            const steps = document.querySelectorAll('#steps-list .step-input');
+            steps.forEach((step, index) => {
+                const header = step.querySelector('h4');
+                header.textContent = `Step ${index + 1}`;
+            });
+        }
+
+        function generateStepCodes() {
+            const prefix = document.getElementById('quest_prefix').value.trim();
+            const steps = document.querySelectorAll('#steps-list .step-input');
+            const codes = [];
+            
+            for (let i = 0; i < steps.length; i++) {
+                codes.push(`${prefix}-${i + 1}`);
+            }
+            
+            return codes;
+        }
+
+        // Add one step by default
+        addStep();
+
+        document.getElementById('questForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = {};
+            
+            // Convert FormData to regular object
+            for (let [key, value] of formData.entries()) {
+                if (key === 'step_descriptions[]') {
+                    if (!data.step_descriptions) data.step_descriptions = [];
+                    if (value.trim()) data.step_descriptions.push(value.trim());
+                } else if (key === 'step_locations[]') {
+                    if (!data.step_locations) data.step_locations = [];
+                    if (value.trim()) data.step_locations.push(value.trim());
+                } else if (key === 'step_curriculum_alignments[]') {
+                    if (!data.step_curriculum_alignments) data.step_curriculum_alignments = [];
+                    if (value.trim()) data.step_curriculum_alignments.push(value.trim());
+                } else if (key === 'step_description_curriculum_alignments[]') {
+                    if (!data.step_description_curriculum_alignments) data.step_description_curriculum_alignments = [];
+                    data.step_description_curriculum_alignments.push(value.trim());
+                } else {
+                    data[key] = value;
+                }
+            }
+
+            // Ensure quest_image is included if provided
+            if (document.getElementById('quest_image').value.trim()) {
+                data.quest_image = document.getElementById('quest_image').value.trim();
+                console.log('Quest image will be sent:', data.quest_image);
+            } else {
+                console.log('No quest image provided');
+            }
+
+            // Generate step codes automatically
+            data.step_codes = generateStepCodes();
+            
+            // Validate that we have all required fields for all steps
+            if (data.step_descriptions && data.step_descriptions.length !== data.step_codes.length) {
+                alert('Please provide descriptions for all steps');
+                return;
+            }
+            
+            if (data.step_locations && data.step_locations.length !== data.step_codes.length) {
+                alert('Please select locations for all steps');
+                return;
+            }
+            
+            if (data.step_curriculum_alignments && data.step_curriculum_alignments.length !== data.step_codes.length) {
+                alert('Please provide curriculum alignments for all steps');
+                return;
+            }
+
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Generating quest and steps...';
+            resultDiv.className = '';
+
+            try {
+                const response = await fetch('/generate-quest', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    resultDiv.className = 'success';
+                    let message = `
+                        <strong>✅ Quest Generated Successfully!</strong><br>
+                        <strong>Quest Name:</strong> ${result.quest_name}<br>
+                        <strong>Quest Record ID:</strong> ${result.record_id}<br>
+                        <strong>Quest Prefix:</strong> ${result.quest_prefix}<br>
+                        <strong>Steps Created:</strong> ${result.num_steps} steps<br>
+                    `;
+                    
+                    if (result.steps_created && result.steps_created.length > 0) {
+                        message += `<strong>Step Codes:</strong> ${result.steps_created.join(', ')}<br>`;
+                    }
+                    
+                    message += '<em>Quest and steps have been added to the database.</em>';
+                    resultDiv.innerHTML = message;
+                    
+                    // Reset form
+                    document.getElementById('questForm').reset();
+                    document.getElementById('steps-list').innerHTML = '';
+                    stepCounter = 0;
+                    addStep();
+                } else {
+                    throw new Error(result.error || 'Unknown error occurred');
+                }
+            } catch (error) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `<strong>❌ Error:</strong> ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
