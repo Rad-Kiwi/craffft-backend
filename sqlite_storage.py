@@ -221,7 +221,7 @@ class SQLiteStorage:
                     return True
                 else:
                     missing_data = [t for t in critical_tables if t not in tables_with_data]
-                    print(f"Some critical tables missing data: {missing_data} - will sync from Airtable")
+                    print(f"Some critical tables missing data: {missing_data}")
                     return False
                 
         except Exception as e:
