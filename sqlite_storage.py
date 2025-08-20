@@ -253,6 +253,49 @@ class SQLiteStorage:
             print(f"Error adding record to {table_name}: {e}")
             return False
 
+    def delete_record(self, table_name: str, column_name: str, value: str) -> bool:
+        """
+        Delete a record from the table.
+        
+        Args:
+            table_name: Name of the table
+            column_name: Column to match for deletion
+            value: Value to match
+            
+        Returns:
+            True if record was deleted successfully, False otherwise
+        """
+        try:
+            with self.engine.begin() as conn:
+                # Check if table exists
+                table_exists_result = conn.execute(
+                    text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table_name"),
+                    {"table_name": table_name}
+                )
+                table_exists = table_exists_result.fetchone() is not None
+                
+                if not table_exists:
+                    print(f"Table {table_name} does not exist")
+                    return False
+                
+                # Check if column exists
+                existing_columns_result = conn.execute(text(f'PRAGMA table_info("{table_name}")'))
+                existing_columns = {row[1] for row in existing_columns_result.fetchall()}  # row[1] is column name
+                
+                if column_name not in existing_columns:
+                    print(f"Column {column_name} does not exist in table {table_name}")
+                    return False
+                
+                # Execute delete statement
+                delete_stmt = text(f'DELETE FROM "{table_name}" WHERE "{column_name}" = :value')
+                result = conn.execute(delete_stmt, {"value": value})
+                
+                return result.rowcount > 0
+                
+        except Exception as e:
+            print(f"Error deleting from {table_name}: {e}")
+            return False
+
     def has_data_in_critical_tables(self) -> bool:
         """
         Check if ALL critical tables have data.

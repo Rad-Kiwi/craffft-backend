@@ -181,6 +181,33 @@ class TableManager:
             print(f"Error adding record to {self.table_name}: {e}")
             return False
 
+    def delete_record(self, column_containing_reference: str, reference_value: str) -> bool:
+        """
+        Delete a record from the table.
+        
+        Args:
+            column_containing_reference: Column to look up the row
+            reference_value: Value to match in the lookup column
+            
+        Returns:
+            True if record was deleted successfully, False otherwise
+        """
+        if not self.sqlite_storage:
+            return False
+            
+        try:
+            # Delete the record from SQLite
+            success = self.sqlite_storage.delete_record(self.table_name, column_containing_reference, reference_value)
+            
+            if success:
+                self.has_updates = True
+                
+            return success
+            
+        except Exception as e:
+            print(f"Error deleting record from {self.table_name}: {e}")
+            return False
+
     def get_full_table(self):
         """
         Get all records from the table as a list of dictionaries

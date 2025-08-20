@@ -4,6 +4,7 @@ from sqlite_storage import SQLiteStorage
 from table_manager import TableManager
 from student_data_manager import StudentDataManager
 from utilities import load_env, parse_database_row
+import json
 import asyncio
 from app import app
 
@@ -252,7 +253,7 @@ def test_update_step_and_check_quest():
     
     # Test parameters - use a known student
     website_id = "10"  # Using a test student ID that likely exists
-    test_step = "WW -3"  # A test step ID
+    test_step = "WW-3"  # A test step ID
     
     print(f"Testing update for student website_id: {website_id} with step: {test_step}")
     
@@ -433,6 +434,64 @@ def test_update_student_current_step_route():
         assert response.status_code == 200
         assert response.get_json().get("message") == "Student current_step updated successfully"
 
+def test_add_students_api():
+    """Test the /add-students API endpoint with database verification and cleanup."""
+    print("\n=== Testing /add-students API endpoint with database verification ===")
+    
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    
+    # Test student data - format expected by the API
+    test_data = {
+        "students": [
+            {
+                "first_name": "Test",
+                "last_name": "Student",
+                "gamer_tag": "@teststudent123",
+                "website_id": 999,
+                "current_class": 6
+            }
+        ]
+    }
+    
+    # Make POST request to add students
+    with app.test_client() as client:
+        response = client.post('/add-students', 
+                               data=json.dumps(test_data),
+                               content_type='application/json')
+        
+        print(f"Add students response: {response.status_code}")
+        print(f"Response data: {response.get_json()}")
+        
+        # Verify the response is successful
+        assert response.status_code == 201
+        response_data = response.get_json()
+        assert response_data['added_count'] == 1
+        
+        # Verify the student was actually added to the database
+        students_manager = multi_manager.get_manager("craffft_students")
+        student_record = students_manager.get_row("gamer_tag", "@teststudent123")
+        
+        print(f"Student record from database: {student_record}")
+        
+        # Verify the record exists and has correct data
+        assert student_record is not None, "Student record should exist in database"
+        assert student_record['first_name'] == "Test"
+        assert student_record['last_name'] == "Student"
+        assert student_record['gamer_tag'] == "@teststudent123"
+        assert student_record['website_id'] == "999"  # Stored as string in database
+        assert student_record['current_class'] == "6"  # Stored as string in database
+        
+        # Cleanup: Delete the test student from the database
+        delete_success = students_manager.delete_record("gamer_tag", "@teststudent123")
+        assert delete_success == True, "Should successfully delete test student"
+        
+        # Verify the student was actually deleted
+        deleted_record = students_manager.get_row("gamer_tag", "@teststudent123")
+        assert deleted_record is None, "Student record should be deleted from database"
+        
+        print("✓ Student API test completed with database verification and cleanup")
+
 def run_all_tests():
     import sys
     import types
@@ -455,4 +514,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    test_update_step_and_check_quest()
+    test_add_students_api()
