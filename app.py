@@ -301,6 +301,143 @@ def update_and_check_quest():
     })
 
 
+@app.route("/add-students", methods=['POST'])
+def add_students():
+    """
+    Add a list of students to the craffft_students table.
+    
+    Expected JSON format:
+    {
+        "students": [
+            {
+                "first_name": "John",
+                "last_name": "Doe",
+                "gamer_tag": "johndoe123", 
+                "website_id": 12345,
+                "current_class": 1
+            },
+            ...
+        ]
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+        
+        students_list = data.get('students', [])
+        if not students_list:
+            return jsonify({"error": "Missing 'students' array in request"}), 400
+        
+        if not isinstance(students_list, list):
+            return jsonify({"error": "'students' must be an array"}), 400
+        
+        # Get the students table manager
+        students_manager = multi_manager.get_manager("craffft_students")
+        if not students_manager:
+            return jsonify({"error": "craffft_students table not found"}), 404
+        
+        added_students = []
+        failed_students = []
+        
+        for i, student in enumerate(students_list):
+            try:
+                # Validate required fields
+                required_fields = ['first_name', 'last_name', 'gamer_tag', 'website_id', 'current_class']
+                missing_fields = [field for field in required_fields if field not in student or student.get(field) is None]
+                
+                if missing_fields:
+                    failed_students.append({
+                        "index": i,
+                        "student": student,
+                        "error": f"Missing required fields: {', '.join(missing_fields)}"
+                    })
+                    continue
+                
+                # Validate data types
+                if not isinstance(student['website_id'], int):
+                    failed_students.append({
+                        "index": i,
+                        "student": student,
+                        "error": "website_id must be an integer"
+                    })
+                    continue
+                    
+                if not isinstance(student['current_class'], int):
+                    failed_students.append({
+                        "index": i,
+                        "student": student,
+                        "error": "current_class must be an integer"
+                    })
+                    continue
+                
+                # Generate record ID
+                import uuid
+                record_id = f"rec{str(uuid.uuid4()).replace('-', '')[:10]}"
+                
+                # Create student record based on your table structure
+                student_record = {
+                    'record_id': record_id,
+                    'first_name': student['first_name'].strip(),
+                    'last_name': student['last_name'].strip(),
+                    'gamer_tag': student['gamer_tag'].strip(),
+                    'website_id': str(student['website_id']),  # Convert int to string for database
+                    'current_class': str(student['current_class']),  # Convert int to string for database
+                    # Set default values for other fields based on your table structure
+                    'current_quest': student.get('current_quest', ''),
+                    'current_step': student.get('current_step', ''),
+                    'level': student.get('level', '1'),  # Default to level 1
+                    'badge': student.get('badge', ''),
+                    'class_number': student.get('class_number', '1'),  # Default to 1
+                }
+                
+                # Add the student to the database
+                success = students_manager.add_record(student_record)
+                
+                if success:
+                    added_students.append({
+                        "record_id": record_id,
+                        "first_name": student['first_name'],
+                        "last_name": student['last_name'],
+                        "gamer_tag": student['gamer_tag'],
+                        "website_id": student['website_id']  # Keep as integer in response
+                    })
+                else:
+                    failed_students.append({
+                        "index": i,
+                        "student": student,
+                        "error": "Failed to add to database"
+                    })
+                    
+            except Exception as e:
+                failed_students.append({
+                    "index": i,
+                    "student": student,
+                    "error": f"Unexpected error: {str(e)}"
+                })
+        
+        # Mark table as modified for Airtable sync
+        if added_students:
+            multi_manager.mark_table_as_modified("craffft_students")
+        
+        # Prepare response
+        response_data = {
+            "message": f"Processed {len(students_list)} students",
+            "added_count": len(added_students),
+            "failed_count": len(failed_students),
+            "added_students": added_students
+        }
+        
+        if failed_students:
+            response_data["failed_students"] = failed_students
+        
+        status_code = 201 if len(added_students) > 0 else 400
+        return jsonify(response_data), status_code
+        
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+
+
 @app.route("/upload-to-airtable", methods=['POST'])
 def upload_to_airtable():
     """
