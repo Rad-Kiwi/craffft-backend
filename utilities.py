@@ -219,3 +219,58 @@ def parse_database_row(row):
             parsed_row[key] = deep_jsonify(value, parse_stringified_lists=True)
     
     return parsed_row
+
+
+def process_quest_data_for_frontend(quest_data):
+    """
+    Process quest data to make it ready for frontend consumption.
+    Ensures all required fields are present and properly formatted.
+    
+    Args:
+        quest_data: List of quest objects from database
+        
+    Returns:
+        List of processed quest objects with frontend-ready structure
+    """
+    processed_quests = []
+    
+    if not quest_data or not isinstance(quest_data, list):
+        return processed_quests
+        
+    for quest in quest_data:
+        try:
+            # Parse the quest data to handle stringified fields
+            parsed_quest = parse_database_row(quest)
+            
+            # Create frontend-ready quest object with all required fields
+            processed_quest = {
+                'record_id': parsed_quest.get('record_id', ''),
+                'quest_name': parsed_quest.get('quest_name', 'Unnamed Quest'),
+                'quest_description': parsed_quest.get('quest_description', 'No description available'),
+                'quest_image': parsed_quest.get('quest_image', '/default-quest-image.png'),  # Fallback image
+                'teacher_resource_url': parsed_quest.get('teacher_resource_url', '#'),  # Fallback URL
+                'steps': parsed_quest.get('steps', []),
+                'num_steps': len(parsed_quest.get('steps', [])),  # Calculate from steps array
+                # Add any other fields that might be useful for frontend
+                'difficulty': parsed_quest.get('difficulty', 'Medium'),
+                'estimated_time': parsed_quest.get('estimated_time', 'Unknown'),
+            }
+            
+            processed_quests.append(processed_quest)
+            
+        except Exception as e:
+            print(f"Error processing quest data: {e}")
+            # Add a minimal quest object to prevent frontend crashes
+            processed_quests.append({
+                'record_id': quest.get('record_id', ''),
+                'quest_name': 'Error Loading Quest',
+                'quest_description': 'There was an error loading this quest.',
+                'quest_image': '/error-image.png',
+                'teacher_resource_url': '#',
+                'steps': [],
+                'num_steps': 0,
+                'difficulty': 'Unknown',
+                'estimated_time': 'Unknown',
+            })
+    
+    return processed_quests
