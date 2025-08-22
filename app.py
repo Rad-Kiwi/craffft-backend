@@ -446,11 +446,11 @@ def assign_quests():
         "assignments": [
             {
                 "websiteId": 12345,
-                "quest_name": "rec123abc"
+                "quest_name": "Garlic Guardians"
             },
             {
                 "websiteId": 12346,
-                "quest_name": "rec456def"
+                "quest_name": "Electric Orchard"
             }
         ]
     }
