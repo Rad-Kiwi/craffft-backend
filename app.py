@@ -436,6 +436,75 @@ def add_students():
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
+@app.route("/assign-quests", methods=['POST'])
+def assign_quests():
+    """
+    Assign quests to multiple students.
+    
+    Expected JSON format:
+    {
+        "assignments": [
+            {
+                "websiteId": 12345,
+                "quest_name": "rec123abc"
+            },
+            {
+                "websiteId": 12346,
+                "quest_name": "rec456def"
+            }
+        ]
+    }
+    """
+    try:
+        data = request.get_json()
+        assignments = data.get('assignments', [])
+        
+        if not assignments:
+            return jsonify({"error": "Missing 'assignments' array"}), 400
+        
+        students_manager = multi_manager.get_manager("craffft_students")
+        successful_assignments = []
+        failed_assignments = []
+        
+        for assignment in assignments:
+            website_id = assignment.get('websiteId')
+            quest_name = assignment.get('quest_name')
+            
+            if not website_id or not quest_name:
+                failed_assignments.append(assignment)
+                continue
+            
+            # Assign the quest
+            success = students_manager.modify_field(
+                column_containing_reference="website_id",
+                reference_value=str(website_id),
+                target_column="current_quest",
+                new_value=quest_name
+            )
+            
+            if success:
+                successful_assignments.append({
+                    "websiteId": website_id,
+                    "quest_name": quest_name
+                })
+            else:
+                failed_assignments.append(assignment)
+        
+        # Mark table as modified for Airtable sync
+        if successful_assignments:
+            multi_manager.mark_table_as_modified("craffft_students")
+        
+        return jsonify({
+            "successful_count": len(successful_assignments),
+            "failed_count": len(failed_assignments),
+            "successful_assignments": successful_assignments,
+            "failed_assignments": failed_assignments
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/upload-to-airtable", methods=['POST'])
 def upload_to_airtable():
     """
