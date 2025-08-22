@@ -386,9 +386,7 @@ def add_students():
                     # Set default values for other fields based on your table structure
                     'current_quest': student.get('current_quest', ''),
                     'current_step': student.get('current_step', ''),
-                    'level': student.get('level', '1'),  # Default to level 1
-                    'badge': student.get('badge', ''),
-                    'class_number': student.get('class_number', '1'),  # Default to 1
+                    'quest_progress_percentage': '0' # Default to 0
                 }
                 
                 # Add the student to the database
