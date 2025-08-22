@@ -1,4 +1,4 @@
-from utilities import parse_database_row
+from utilities import parse_database_row, process_quest_data_for_frontend
 class StudentDataManager:
     def __init__(self, airtable_multi_manager):
         if airtable_multi_manager is None:
@@ -81,8 +81,11 @@ class StudentDataManager:
         quest_data = []
         if unique_quests:
             ids_str = "', '".join(unique_quests)
-            sql = f"SELECT * FROM craffft_quests WHERE record_id IN ('{ids_str}')"
-            quest_data = self.airtable_multi_manager.execute_sql_query('craffft_quests', sql) or []
+            sql = f"SELECT * FROM craffft_quests WHERE quest_name IN ('{ids_str}')"
+            raw_quest_data = self.airtable_multi_manager.execute_sql_query('craffft_quests', sql) or []
+            
+            # Process quest data for frontend consumption
+            quest_data = process_quest_data_for_frontend(raw_quest_data)
 
         # Process each student to add quest details
         for student in students:
