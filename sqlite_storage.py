@@ -215,12 +215,13 @@ class SQLiteStorage:
                     print(f"Warning: Column name '{col}' in table '{table_name}' contains special characters. This may cause issues with SQLite.")
             
             with self.engine.begin() as conn:
-                # Check if table exists
-                table_exists_result = conn.execute(
-                    text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table_name"),
-                    {"table_name": table_name}
-                )
-                table_exists = table_exists_result.fetchone() is not None
+                # Check if table exists (database-agnostic way)
+                try:
+                    # Try to query the table - if it doesn't exist, this will raise an exception
+                    conn.execute(text(f'SELECT 1 FROM "{table_name}" LIMIT 1'))
+                    table_exists = True
+                except Exception:
+                    table_exists = False
                 
                 if not table_exists:
                     # Create table if it doesn't exist
@@ -229,14 +230,34 @@ class SQLiteStorage:
                         text(f'CREATE TABLE IF NOT EXISTS "{table_name}" ({columns_sql})')
                     )
                 else:
-                    # Table exists, check for missing columns and add them
-                    existing_columns_result = conn.execute(text(f'PRAGMA table_info("{table_name}")'))
-                    existing_columns = {row[1] for row in existing_columns_result.fetchall()}  # row[1] is column name
+                    # Table exists, check for missing columns and add them (database-agnostic way)
+                    try:
+                        # Get existing columns based on environment
+                        MODE = load_env('ENVIRONMENT_MODE')
+                        if MODE == 'Production':
+                            # PostgreSQL syntax (production)
+                            existing_columns_result = conn.execute(
+                                text("SELECT column_name FROM information_schema.columns WHERE table_name = :table_name"),
+                                {"table_name": table_name}
+                            )
+                            existing_columns = {row[0] for row in existing_columns_result.fetchall()}
+                        else:
+                            # SQLite syntax (local development)
+                            existing_columns_result = conn.execute(text(f'PRAGMA table_info("{table_name}")'))
+                            existing_columns = {row[1] for row in existing_columns_result.fetchall()}  # row[1] is column name
+                    except Exception as e:
+                        print(f"Error getting column info for {table_name}: {e}")
+                        # If we can't get column info, assume all columns are missing and try to add them
+                        existing_columns = set()
                     
                     missing_columns = set(fieldnames) - existing_columns
                     for col in missing_columns:
-                        print(f"Adding missing column '{col}' to table '{table_name}'")
-                        conn.execute(text(f'ALTER TABLE "{table_name}" ADD COLUMN "{col}" TEXT'))
+                        try:
+                            print(f"Adding missing column '{col}' to table '{table_name}'")
+                            conn.execute(text(f'ALTER TABLE "{table_name}" ADD COLUMN "{col}" TEXT'))
+                        except Exception as e:
+                            print(f"Warning: Could not add column '{col}' to table '{table_name}': {e}")
+                            # Continue anyway - the INSERT might still work if the column actually exists
                 
                 # Insert the new record
                 placeholders = ', '.join([f':{col}' for col in fieldnames])
@@ -267,24 +288,38 @@ class SQLiteStorage:
         """
         try:
             with self.engine.begin() as conn:
-                # Check if table exists
-                table_exists_result = conn.execute(
-                    text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table_name"),
-                    {"table_name": table_name}
-                )
-                table_exists = table_exists_result.fetchone() is not None
+                # Check if table exists (database-agnostic way)
+                try:
+                    conn.execute(text(f'SELECT 1 FROM "{table_name}" LIMIT 1'))
+                    table_exists = True
+                except Exception:
+                    table_exists = False
                 
                 if not table_exists:
                     print(f"Table {table_name} does not exist")
                     return False
                 
-                # Check if column exists
-                existing_columns_result = conn.execute(text(f'PRAGMA table_info("{table_name}")'))
-                existing_columns = {row[1] for row in existing_columns_result.fetchall()}  # row[1] is column name
-                
-                if column_name not in existing_columns:
-                    print(f"Column {column_name} does not exist in table {table_name}")
-                    return False
+                # Check if column exists (database-agnostic way)
+                try:
+                    MODE = load_env('ENVIRONMENT_MODE')
+                    if MODE == 'Production':
+                        # PostgreSQL syntax (production)
+                        existing_columns_result = conn.execute(
+                            text("SELECT column_name FROM information_schema.columns WHERE table_name = :table_name"),
+                            {"table_name": table_name}
+                        )
+                        existing_columns = {row[0] for row in existing_columns_result.fetchall()}
+                    else:
+                        # SQLite syntax (local development)
+                        existing_columns_result = conn.execute(text(f'PRAGMA table_info("{table_name}")'))
+                        existing_columns = {row[1] for row in existing_columns_result.fetchall()}
+                    
+                    if column_name not in existing_columns:
+                        print(f"Column {column_name} does not exist in table {table_name}")
+                        return False
+                except Exception as e:
+                    print(f"Warning: Could not check column existence: {e}")
+                    # Proceed anyway - the DELETE might still work
                 
                 # Execute delete statement
                 delete_stmt = text(f'DELETE FROM "{table_name}" WHERE "{column_name}" = :value')
