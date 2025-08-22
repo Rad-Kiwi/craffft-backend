@@ -125,7 +125,7 @@ def update_table_from_airtable():
             if not manager:
                 return jsonify({"error": f"Table '{table_name}' not found"}), 404
             
-            result = manager.update_from_airtable()
+            result = manager.update_database_from_airtable()
             
             if result and not str(result).startswith("Error"):
                 return jsonify({
