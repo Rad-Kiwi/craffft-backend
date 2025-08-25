@@ -492,6 +492,124 @@ def test_add_students_api():
         
         print("✓ Student API test completed with database verification and cleanup")
 
+def test_assign_quests_api():
+    """Test the /assign-quests API endpoint with database verification and cleanup."""
+    print("\n=== Testing /assign-quests API endpoint ===")
+    
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    
+    # First, add a test student if needed
+    students_manager = multi_manager.get_manager("craffft_students")
+    test_website_id = 888
+    test_gamer_tag = "@questtestStudent"
+    
+    # Check if test student exists, if not create one
+    existing_student = students_manager.get_row("website_id", str(test_website_id))
+    if not existing_student:
+        # Add test student
+        success = students_manager.add_record({
+            "first_name": "Quest",
+            "last_name": "TestStudent", 
+            "gamer_tag": test_gamer_tag,
+            "website_id": str(test_website_id),
+            "current_class": "1",
+            "current_quest": "initial_quest"
+        })
+        assert success, "Should successfully add test student"
+        print(f"Added test student with website_id: {test_website_id}")
+    
+    # Test quest assignment data
+    test_data = {
+        "assignments": [
+            {
+                "websiteId": test_website_id,
+                "quest_name": "rec123testquest"
+            }
+        ]
+    }
+    
+    # Make POST request to assign quests
+    with app.test_client() as client:
+        response = client.post('/assign-quests', 
+                               data=json.dumps(test_data),
+                               content_type='application/json')
+        
+        print(f"Assign quests response: {response.status_code}")
+        print(f"Response data: {response.get_json()}")
+        
+        # Verify the response is successful
+        assert response.status_code == 200
+        response_data = response.get_json()
+        assert response_data['successful_count'] == 1
+        assert response_data['failed_count'] == 0
+        
+        # Verify the quest was actually assigned in the database
+        updated_student = students_manager.get_row("website_id", str(test_website_id))
+        
+        print(f"Updated student record: {updated_student}")
+        
+        # Verify the quest assignment
+        assert updated_student is not None, "Student record should exist in database"
+        assert updated_student['current_quest'] == "rec123testquest", "Quest should be assigned correctly"
+        
+        # Test with missing websiteId
+        invalid_data = {
+            "assignments": [
+                {
+                    "quest_name": "rec123testquest"  # Missing websiteId
+                }
+            ]
+        }
+        
+        response2 = client.post('/assign-quests',
+                               data=json.dumps(invalid_data),
+                               content_type='application/json')
+        
+        assert response2.status_code == 200  # Still returns 200 but with failures
+        response2_data = response2.get_json()
+        assert response2_data['successful_count'] == 0
+        assert response2_data['failed_count'] == 1
+        
+        # Test with missing quest_name
+        invalid_data2 = {
+            "assignments": [
+                {
+                    "websiteId": test_website_id  # Missing quest_name
+                }
+            ]
+        }
+        
+        response3 = client.post('/assign-quests',
+                               data=json.dumps(invalid_data2),
+                               content_type='application/json')
+        
+        assert response3.status_code == 200  # Still returns 200 but with failures
+        response3_data = response3.get_json()
+        assert response3_data['successful_count'] == 0
+        assert response3_data['failed_count'] == 1
+        
+        # Test with empty assignments array
+        empty_data = {"assignments": []}
+        
+        response4 = client.post('/assign-quests',
+                               data=json.dumps(empty_data),
+                               content_type='application/json')
+        
+        assert response4.status_code == 400  # Should return 400 for empty assignments
+        response4_data = response4.get_json()
+        assert "Missing 'assignments' array" in response4_data['error']
+        
+        # Cleanup: Delete the test student from the database
+        delete_success = students_manager.delete_record("website_id", str(test_website_id))
+        assert delete_success == True, "Should successfully delete test student"
+        
+        # Verify the student was actually deleted
+        deleted_record = students_manager.get_row("website_id", str(test_website_id))
+        assert deleted_record is None, "Student record should be deleted from database"
+        
+        print("✓ Quest assignment API test completed with database verification and cleanup")
+
 def run_all_tests():
     import sys
     import types
@@ -514,4 +632,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    test_add_students_api()
+    test_assign_quests_api()
