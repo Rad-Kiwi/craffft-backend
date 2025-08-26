@@ -7,9 +7,13 @@ import threading
 from scheduler import DailyAirtableUploader
 from utilities import load_env, deep_jsonify, parse_database_row, critical_tables
 from quest_routes import quest_bp
+from admin_routes import admin_bp
 
 app = Flask(__name__)
 CORS(app)
+
+# Configure session for admin authentication
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 ENVIRONMENT_MODE = load_env('ENVIRONMENT_MODE')
 
@@ -53,6 +57,9 @@ app.config['multi_manager'] = multi_manager
 
 # Register quest routes blueprint
 app.register_blueprint(quest_bp)
+
+# Register admin routes blueprint
+app.register_blueprint(admin_bp)
 
 
 def deep_jsonify_response(obj):
