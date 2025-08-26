@@ -556,6 +556,73 @@ def assign_quests():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/assign-achievement-to-student", methods=['POST'])
+def assign_achievement_to_student():
+    """
+    Assign an achievement to a student.
+    
+    Expected JSON format:
+    {
+        "websiteId": 12345,
+        "achievement_name": "First Quest Complete"
+    }
+    
+    Or use query parameters: /assign-achievement-to-student?websiteId=12345&achievement_name=First Quest Complete
+    """
+    try:
+        # Get parameters from JSON body or query parameters
+        website_id = None
+        achievement_name = None
+        
+        if request.is_json:
+            data = request.get_json()
+            if data:
+                website_id = data.get('websiteId')
+                achievement_name = data.get('achievement_name')
+        
+        if not website_id:
+            website_id = request.args.get('websiteId')
+        if not achievement_name:
+            achievement_name = request.args.get('achievement_name')
+        
+        if not website_id or not achievement_name:
+            return jsonify({"error": "Missing required parameters: websiteId and achievement_name"}), 400
+        
+        # Get the achievements table manager
+        achievements_manager = multi_manager.get_manager("craffft_achievements")
+        if not achievements_manager:
+            return jsonify({"error": "craffft_achievements table not found"}), 404
+        
+        # Look up the achievement by name
+        achievement_row = achievements_manager.get_row("name", achievement_name)
+        if not achievement_row:
+            return jsonify({"error": f"Achievement '{achievement_name}' not found"}), 404
+        
+        # Get the students table manager
+        students_manager = multi_manager.get_manager("craffft_students")
+        if not students_manager:
+            return jsonify({"error": "craffft_students table not found"}), 404
+        
+        # Verify the student exists
+        student_row = students_manager.get_row("website_id", str(website_id))
+        if not student_row:
+            return jsonify({"error": f"Student with websiteId {website_id} not found"}), 404
+        
+        # Parse the achievement row to handle stringified data
+        parsed_achievement = parse_database_row(achievement_row)
+        
+        # Return success response with the achievement data
+        return jsonify({
+            "message": "Achievement assigned successfully",
+            "websiteId": website_id,
+            "student_name": f"{student_row.get('first_name', '')} {student_row.get('last_name', '')}".strip(),
+            "achievement": parsed_achievement
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+
+
 @app.route("/upload-to-airtable", methods=['POST'])
 def upload_to_airtable():
     """

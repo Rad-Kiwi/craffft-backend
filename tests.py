@@ -610,6 +610,128 @@ def test_assign_quests_api():
         
         print("✓ Quest assignment API test completed with database verification and cleanup")
 
+def test_assign_achievement_to_student_api():
+    """Test the /assign-achievement-to-student API endpoint with database verification."""
+    print("\n=== Testing /assign-achievement-to-student API endpoint ===")
+    
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    
+    # Test parameters
+    test_website_id = 9
+    test_achievement_name = "test badge"
+    
+    print(f"Testing achievement assignment for student websiteId: {test_website_id}, achievement: '{test_achievement_name}'")
+    
+    # Verify the student exists
+    students_manager = multi_manager.get_manager("craffft_students")
+    student_record = students_manager.get_row("website_id", str(test_website_id))
+    
+    if not student_record:
+        print(f"Warning: Student with websiteId {test_website_id} not found. Skipping test.")
+        return
+    
+    print(f"Found student: {student_record.get('first_name', '')} {student_record.get('last_name', '')}")
+    
+    # Verify the achievement exists
+    achievements_manager = multi_manager.get_manager("craffft_achievements")
+    achievement_record = achievements_manager.get_row("name", test_achievement_name)
+    
+    if not achievement_record:
+        print(f"Warning: Achievement '{test_achievement_name}' not found. Skipping test.")
+        return
+    
+    print(f"Found achievement: {achievement_record.get('name', '')} - {achievement_record.get('description', '')}")
+    
+    # Test 1: POST with JSON body
+    test_data = {
+        "websiteId": test_website_id,
+        "achievement_name": test_achievement_name
+    }
+    
+    with app.test_client() as client:
+        response = client.post('/assign-achievement-to-student', 
+                               data=json.dumps(test_data),
+                               content_type='application/json')
+        
+        print(f"POST response: {response.status_code}")
+        print(f"Response data: {response.get_json()}")
+        
+        # Verify successful response
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        response_data = response.get_json()
+        
+        assert response_data['message'] == "Achievement assigned successfully"
+        assert response_data['websiteId'] == test_website_id
+        assert 'student_name' in response_data
+        assert 'achievement' in response_data
+        
+        # Verify achievement data is returned
+        achievement_data = response_data['achievement']
+        assert achievement_data['name'] == test_achievement_name
+        assert 'description' in achievement_data or 'badge' in achievement_data
+        
+        print(f"✓ POST test passed - Achievement: {achievement_data.get('name')}")
+    
+    # Test 2: Invalid student ID
+    invalid_data = {
+        "websiteId": 99999,  # Non-existent student
+        "achievement_name": test_achievement_name
+    }
+    
+    with app.test_client() as client:
+        response = client.post('/assign-achievement-to-student',
+                               data=json.dumps(invalid_data),
+                               content_type='application/json')
+        
+        print(f"Invalid student test response: {response.status_code}")
+        
+        assert response.status_code == 404, f"Expected 404 for invalid student, got {response.status_code}"
+        response_data = response.get_json()
+        assert "not found" in response_data['error'].lower()
+        
+        print("✓ Invalid student test passed")
+    
+    # Test 3: Invalid achievement name
+    invalid_achievement_data = {
+        "websiteId": test_website_id,
+        "achievement_name": "Non-existent Achievement"
+    }
+    
+    with app.test_client() as client:
+        response = client.post('/assign-achievement-to-student',
+                               data=json.dumps(invalid_achievement_data),
+                               content_type='application/json')
+        
+        print(f"Invalid achievement test response: {response.status_code}")
+        
+        assert response.status_code == 404, f"Expected 404 for invalid achievement, got {response.status_code}"
+        response_data = response.get_json()
+        assert "not found" in response_data['error'].lower()
+        
+        print("✓ Invalid achievement test passed")
+    
+    # Test 4: Missing parameters
+    missing_data = {
+        "websiteId": test_website_id
+        # Missing achievement_name
+    }
+    
+    with app.test_client() as client:
+        response = client.post('/assign-achievement-to-student',
+                               data=json.dumps(missing_data),
+                               content_type='application/json')
+        
+        print(f"Missing parameters test response: {response.status_code}")
+        
+        assert response.status_code == 400, f"Expected 400 for missing parameters, got {response.status_code}"
+        response_data = response.get_json()
+        assert "missing required parameters" in response_data['error'].lower()
+        
+        print("✓ Missing parameters test passed")
+    
+    print("✅ All assign-achievement-to-student API tests passed!")
+
 def run_all_tests():
     import sys
     import types
@@ -632,4 +754,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    test_assign_quests_api()
+    test_assign_achievement_to_student_api()
