@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Admin - Craffft Backend</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin/database.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗄️ Database Admin</h1>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div class="status" id="connection-status">Connecting...</div>
+                <a href="/admin/logout" style="color: white; text-decoration: none; font-size: 12px;">Logout</a>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="sidebar">
+                <h3>📋 Tables</h3>
+                <ul class="table-list" id="table-list">
+                    <li class="loading">Loading tables...</li>
+                </ul>
+            </div>
+            
+            <div class="content">
+                <div class="query-section">
+                    <h3>🔍 SQL Query</h3>
+                    <textarea class="query-input" id="sql-query" placeholder="Enter your SQL query here...">SELECT * FROM craffft_students LIMIT 10;</textarea>
+                    <br>
+                    <button class="btn" onclick="executeQuery()">Execute Query</button>
+                    <button class="btn btn-danger" onclick="clearResults()">Clear</button>
+                </div>
+                
+                <div class="results" id="results">
+                    <div class="loading">Enter a query and click "Execute Query" to see results</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTable = null;
+
+        // Load available tables
+        async function loadTables() {
+            try {
+                const response = await fetch('/admin/api/tables');
+                const tables = await response.json();
+                
+                const tableList = document.getElementById('table-list');
+                tableList.innerHTML = '';
+                
+                tables.forEach(table => {
+                    const li = document.createElement('li');
+                    li.textContent = table;
+                    li.onclick = () => selectTable(table, li);
+                    tableList.appendChild(li);
+                });
+                
+                document.getElementById('connection-status').textContent = 'Connected';
+                document.getElementById('connection-status').className = 'status connected';
+            } catch (error) {
+                console.error('Error loading tables:', error);
+                document.getElementById('connection-status').textContent = 'Connection Error';
+                document.getElementById('connection-status').className = 'status disconnected';
+                
+                const tableList = document.getElementById('table-list');
+                tableList.innerHTML = '<li style="color: red;">Failed to load tables</li>';
+            }
+        }
+
+        function selectTable(tableName, element) {
+            // Remove active class from all items
+            document.querySelectorAll('.table-list li').forEach(li => {
+                li.classList.remove('active');
+            });
+            
+            // Add active class to selected item
+            element.classList.add('active');
+            currentTable = tableName;
+            
+            // Set query to show table contents
+            document.getElementById('sql-query').value = `SELECT * FROM "${tableName}" LIMIT 50;`;
+            
+            // Auto-execute query
+            executeQuery();
+        }
+
+        async function executeQuery() {
+            const query = document.getElementById('sql-query').value.trim();
+            const resultsDiv = document.getElementById('results');
+            
+            if (!query) {
+                resultsDiv.innerHTML = '<div class="error">Please enter a SQL query</div>';
+                return;
+            }
+            
+            resultsDiv.innerHTML = '<div class="loading">Executing query...</div>';
+            
+            try {
+                const response = await fetch('/admin/api/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+                
+                const result = await response.json();
+                
+                if (result.error) {
+                    resultsDiv.innerHTML = `<div class="error">Error: ${result.error}</div>`;
+                    return;
+                }
+                
+                if (result.data && result.data.length > 0) {
+                    displayResults(result.data);
+                } else {
+                    resultsDiv.innerHTML = '<div class="loading">Query executed successfully. No results returned.</div>';
+                }
+                
+            } catch (error) {
+                console.error('Query execution error:', error);
+                resultsDiv.innerHTML = `<div class="error">Network error: ${error.message}</div>`;
+            }
+        }
+
+        function displayResults(data) {
+            if (!data || data.length === 0) {
+                document.getElementById('results').innerHTML = '<div class="loading">No results found</div>';
+                return;
+            }
+            
+            const columns = Object.keys(data[0]);
+            
+            let html = '<table class="table">';
+            html += '<thead><tr>';
+            columns.forEach(col => {
+                html += `<th>${col}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            
+            data.forEach(row => {
+                html += '<tr>';
+                columns.forEach(col => {
+                    let value = row[col];
+                    // Handle null/undefined values
+                    if (value === null || value === undefined) {
+                        value = '<em>null</em>';
+                    } else if (typeof value === 'string' && value.length > 100) {
+                        value = value.substring(0, 100) + '...';
+                    }
+                    html += `<td>${value}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            document.getElementById('results').innerHTML = html;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '<div class="loading">Enter a query and click "Execute Query" to see results</div>';
+            document.getElementById('sql-query').value = '';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', loadTables);
+        
+        // Allow Ctrl+Enter to execute query
+        document.getElementById('sql-query').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                executeQuery();
+            }
+        });
+    </script>
+</body>
+</html>

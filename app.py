@@ -7,9 +7,13 @@ import threading
 from scheduler import DailyAirtableUploader
 from utilities import load_env, deep_jsonify, parse_database_row, critical_tables
 from quest_routes import quest_bp
+from admin_routes import admin_bp
 
 app = Flask(__name__)
 CORS(app)
+
+# Configure session for admin authentication
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 ENVIRONMENT_MODE = load_env('ENVIRONMENT_MODE')
 
@@ -54,6 +58,9 @@ app.config['multi_manager'] = multi_manager
 # Register quest routes blueprint
 app.register_blueprint(quest_bp)
 
+# Register admin routes blueprint
+app.register_blueprint(admin_bp)
+
 
 def deep_jsonify_response(obj):
     """
@@ -96,6 +103,50 @@ def update_server_from_airtable():
         }), 200
     else:
         return Response(f"Failed to update from Airtable: {results}", status=500)
+
+@app.route("/update-table-from-airtable", methods=['POST'])
+def update_table_from_airtable():
+    """
+    Update specific table(s) from Airtable.
+    
+    Expected JSON format:
+    {
+        "table_name": "craffft_students"  // Required
+    }
+    
+    Or use query parameter: /update-table-from-airtable?table_name=craffft_students
+    """
+    try:
+        # Get table name from JSON body or query parameter
+        table_name = None
+        if request.is_json:
+            data = request.get_json()
+            table_name = data.get('table_name') if data else None
+        
+        if not table_name:
+            table_name = request.args.get('table_name')
+        
+        if table_name:
+            # Update specific table
+            manager = multi_manager.get_manager(table_name)
+            if not manager:
+                return jsonify({"error": f"Table '{table_name}' not found"}), 404
+            
+            result = manager.update_database_from_airtable()
+            
+            if result and not str(result).startswith("Error"):
+                return jsonify({
+                    "message": f"Table '{table_name}' updated successfully from Airtable",
+                    "table": table_name,
+                    "result": result
+                }), 200
+            else:
+                return jsonify({
+                    "error": f"Failed to update table '{table_name}' from Airtable",
+                    "result": result
+                }), 500
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
 @app.route("/get-table-as-json/<table_name>", methods=['GET'])
