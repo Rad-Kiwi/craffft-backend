@@ -359,6 +359,8 @@ def add_students():
     
     Expected JSON format:
     {
+        "teacher": "Smith",
+        "add_classes_to_teacher": true,
         "students": [
             {
                 "first_name": "John",
@@ -375,7 +377,9 @@ def add_students():
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
-        
+
+        teacher_name = data.get('teacher', '')
+        add_classes_to_teacher = data.get('add_classes_to_teacher', False)
         students_list = data.get('students', [])
         if not students_list:
             return jsonify({"error": "Missing 'students' array in request"}), 400
@@ -433,7 +437,7 @@ def add_students():
                     'last_name': student['last_name'].strip(),
                     'gamer_tag': student['gamer_tag'].strip(),
                     'website_id': str(student['website_id']),  # Convert int to string for database
-                    'current_class': str(student['current_class']),  # Convert int to string for database
+                    'current_class': f"{teacher_name}>{str(student['current_class'])}",  # Convert int to string for database
                     # Set default values for other fields based on your table structure
                     'current_quest': student.get('current_quest', ''),
                     'current_step': student.get('current_step', ''),
@@ -469,6 +473,21 @@ def add_students():
         if added_students:
             multi_manager.mark_table_as_modified("craffft_students")
         
+        # Add classes to teacher if requested and students were successfully added
+        teacher_update_result = None
+        if add_classes_to_teacher and teacher_name and added_students and student_data_manager:
+            # Collect unique class IDs from successfully added students
+            class_ids = set()
+            for student in students_list:
+                if 'current_class' in student:
+                    class_ids.add(str(student['current_class']))
+            
+            if class_ids:
+                teacher_update_result = student_data_manager.add_classes_to_teacher(
+                    teacher_last_name=teacher_name,
+                    new_classes=class_ids
+                )
+        
         # Prepare response
         response_data = {
             "message": f"Processed {len(students_list)} students",
@@ -479,6 +498,10 @@ def add_students():
         
         if failed_students:
             response_data["failed_students"] = failed_students
+        
+        # Add teacher update information to response if applicable
+        if teacher_update_result:
+            response_data["teacher_update"] = teacher_update_result
         
         status_code = 201 if len(added_students) > 0 else 400
         return jsonify(response_data), status_code

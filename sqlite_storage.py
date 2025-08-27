@@ -172,22 +172,36 @@ class SQLiteStorage:
     def modify_field(self, table_name: str, column_containing_reference: str, reference_value: str, target_column: str, new_value):
         """
         Modify a field in the specified table.
+        Automatically converts complex data types (lists, dicts) to JSON strings.
         
         Args:
             table_name: Name of the table
             column_containing_reference: Column to look up the row
             reference_value: Value to match in the lookup column
             target_column: Column to update
-            new_value: New value to set
+            new_value: New value to set (will be JSON-serialized if it's a list/dict)
         Returns:
             bool: True if modified successfully, False if row not found or error.
         """
-        with self.engine.begin() as conn:
-            result = conn.execute(
-                text(f'UPDATE "{table_name}" SET "{target_column}" = :new_value WHERE "{column_containing_reference}" = :reference_value'),
-                {"new_value": new_value, "reference_value": reference_value}
-            )
-            return result.rowcount > 0
+        try:
+            # Convert complex data types to JSON strings
+            if isinstance(new_value, (list, dict)):
+                import json
+                processed_value = json.dumps(new_value)
+                print(f"JSON-serialized {type(new_value).__name__} for database storage: {processed_value}")
+            else:
+                processed_value = new_value
+            
+            with self.engine.begin() as conn:
+                result = conn.execute(
+                    text(f'UPDATE "{table_name}" SET "{target_column}" = :new_value WHERE "{column_containing_reference}" = :reference_value'),
+                    {"new_value": processed_value, "reference_value": reference_value}
+                )
+                return result.rowcount > 0
+                
+        except Exception as e:
+            print(f"Error modifying field in {table_name}: {e}")
+            return False
 
     def add_record(self, table_name: str, record_data: dict) -> bool:
         """
