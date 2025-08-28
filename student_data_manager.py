@@ -208,10 +208,12 @@ class StudentDataManager:
             parsed_student = parse_database_row(student_row)
             old_current_step = parsed_student.get("current_step", "")
             old_current_quest = parsed_student.get("current_quest", "")
+            
             current_quest = old_current_quest if old_current_quest else ""
             
             # Use get_value_by_row_and_column to look up the quest for this step
-            step_quest_id = step_manager.get_value_by_row_and_column("name", new_current_step, "craffft_quests")
+            step_quest_id = step_manager.get_value_by_row_and_column("name", new_current_step, "craffft_quest_id")
+        
             if not step_quest_id:
                 return {
                     "success": False,
