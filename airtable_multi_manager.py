@@ -107,17 +107,17 @@ class AirtableMultiManager:
     
     def get_table_as_json(self, table_name: str):
         """
-        Convert table to parsed JSON data (list of dictionaries) for a specific table.
+        Convert table to JSON for a specific table.
         
         Args:
             table_name: Name of the table
             
         Returns:
-            List of dictionaries representing table data, or None if not found
+            JSON data or None if not found
         """
         manager = self.get_manager(table_name)
         if manager:
-            return manager.get_table_as_json_data()
+            return manager.get_table_as_json()
         return None
     
     def update_all_tables(self) -> Dict[str, str]:

@@ -249,7 +249,8 @@ class StudentDataManager:
                     }
                 current_step = new_current_step
 
-            # Update quest progress percentage after step/quest changes
+            # Update quest progress percentage and check for quest completion after step/quest changes
+            quest_completed = False
             try:
                 quest_manager = self.airtable_multi_manager.get_manager("craffft_quests")
                 if quest_manager and current_quest:
@@ -262,6 +263,33 @@ class StudentDataManager:
                         new_progress = StudentDataManager.get_progress(updated_student, current_quest_obj)
                         # Update progress in database
                         student_manager.modify_field("website_id", website_id, "quest_progress_percentage", new_progress)
+                        
+                        # Check if quest is completed (progress is 100%)
+                        if float(new_progress) >= 100.0:
+                            # Quest is completed - check if the student is on the last step
+                            quest_completed = True
+                            print(f"Quest {current_quest} completed for student {website_id}")
+                            
+                            # Get the student's completed quests array
+                            parsed_updated_student = parse_database_row(updated_student)
+                            completed_quests = parsed_updated_student.get("completed_quests", [])
+                            
+                            # Ensure completed_quests is a list
+                            if not isinstance(completed_quests, list):
+                                completed_quests = []
+                            
+                            # Add the current quest to completed quests if not already there
+                            if current_quest not in completed_quests:
+                                completed_quests.append(current_quest)
+                                # Update completed_quests in the database
+                                student_manager.modify_field("website_id", website_id, "completed_quests", completed_quests)
+                            
+                            # Set current_quest to null (empty string)
+                            student_manager.modify_field("website_id", website_id, "current_quest", "")
+                            current_quest = ""  # Update local variable for return value
+                            
+                            print(f"Quest {current_quest} moved to completed quests for student {website_id}")
+                            
             except Exception as e:
                 print(f"Warning: Failed to update quest progress: {e}")
                 # Don't fail the whole operation if progress update fails
@@ -270,7 +298,8 @@ class StudentDataManager:
                 "success": True,
                 "current_step": current_step,
                 "current_quest": current_quest,
-                "quest_changed": quest_changed
+                "quest_changed": quest_changed,
+                "quest_completed": quest_completed
             }
             
         except Exception as e:
