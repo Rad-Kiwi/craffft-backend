@@ -850,6 +850,11 @@ def test_assign_achievement_to_student_api():
         "achievement_name": test_achievement_name
     }
     
+    # Get initial achievements state for comparison
+    initial_student_data = parse_database_row(student_record)
+    initial_achievements = initial_student_data.get('achievements', [])
+    print(f"Initial achievements: {initial_achievements}")
+    
     with app.test_client() as client:
         response = client.post('/assign-achievement-to-student', 
                                data=json.dumps(test_data),
@@ -866,13 +871,64 @@ def test_assign_achievement_to_student_api():
         assert response_data['websiteId'] == test_website_id
         assert 'student_name' in response_data
         assert 'achievement' in response_data
+        assert 'updated_achievements' in response_data
+        assert response_data['database_updated'] is True
         
         # Verify achievement data is returned
         achievement_data = response_data['achievement']
         assert achievement_data['name'] == test_achievement_name
         assert 'description' in achievement_data or 'badge' in achievement_data
         
-        print(f"✓ POST test passed - Achievement: {achievement_data.get('name')}")
+        # CRITICAL: Verify the achievement was actually saved to the database
+        updated_student_record = students_manager.get_row("website_id", str(test_website_id))
+        assert updated_student_record is not None, "Student record should still exist"
+        
+        updated_student_data = parse_database_row(updated_student_record)
+        updated_achievements = updated_student_data.get('achievements', [])
+        
+        print(f"Updated achievements in database: {updated_achievements}")
+        
+        # Verify the achievement was added to the database
+        assert isinstance(updated_achievements, list), "Achievements should be a list"
+        assert test_achievement_name in updated_achievements, f"Achievement '{test_achievement_name}' should be in database"
+        
+        # Verify the response matches what's in the database
+        response_achievements = response_data['updated_achievements']
+        assert updated_achievements == response_achievements, "Database achievements should match response"
+        
+        # Verify it's one more achievement than before
+        expected_count = len(initial_achievements) + 1
+        assert len(updated_achievements) == expected_count, f"Should have {expected_count} achievements, got {len(updated_achievements)}"
+        
+        print(f"✓ POST test passed - Achievement: {achievement_data.get('name')} successfully saved to database")
+        
+        # Test duplicate assignment - should not add again
+        print("\n--- Testing duplicate achievement assignment ---")
+        response2 = client.post('/assign-achievement-to-student', 
+                               data=json.dumps(test_data),
+                               content_type='application/json')
+        
+        print(f"Duplicate assignment response: {response2.status_code}")
+        response2_data = response2.get_json()
+        print(f"Duplicate assignment response data: {response2_data}")
+        
+        # Should return success but indicate already assigned
+        assert response2.status_code == 200
+        assert response2_data['message'] == "Achievement already assigned to student"
+        assert response2_data['already_assigned'] is True
+        
+        # Verify no duplicate was added to database
+        final_student_record = students_manager.get_row("website_id", str(test_website_id))
+        final_student_data = parse_database_row(final_student_record)
+        final_achievements = final_student_data.get('achievements', [])
+        
+        print(f"Final achievements after duplicate attempt: {final_achievements}")
+        
+        # Should be same as before (no duplicate added)
+        assert len(final_achievements) == expected_count, "Duplicate should not be added"
+        assert final_achievements == updated_achievements, "Achievements list should remain unchanged"
+        
+        print("✓ Duplicate assignment test passed - no duplicate added to database")
     
     # Test 2: Invalid student ID
     invalid_data = {
@@ -931,6 +987,39 @@ def test_assign_achievement_to_student_api():
         
         print("✓ Missing parameters test passed")
     
+    # Cleanup: Remove the test achievement from the student's record
+    print("\n--- Cleanup: Removing test achievement ---")
+    cleanup_student_record = students_manager.get_row("website_id", str(test_website_id))
+    if cleanup_student_record:
+        cleanup_student_data = parse_database_row(cleanup_student_record)
+        cleanup_achievements = cleanup_student_data.get('achievements', [])
+        
+        if test_achievement_name in cleanup_achievements:
+            # Remove the test achievement
+            updated_cleanup_achievements = [ach for ach in cleanup_achievements if ach != test_achievement_name]
+            
+            cleanup_success = students_manager.modify_field(
+                column_containing_reference="website_id",
+                reference_value=str(test_website_id),
+                target_column="achievements",
+                new_value=updated_cleanup_achievements
+            )
+            
+            if cleanup_success:
+                print(f"✓ Successfully removed test achievement '{test_achievement_name}' from student record")
+                
+                # Verify cleanup
+                final_cleanup_record = students_manager.get_row("website_id", str(test_website_id))
+                final_cleanup_data = parse_database_row(final_cleanup_record)
+                final_cleanup_achievements = final_cleanup_data.get('achievements', [])
+                
+                assert test_achievement_name not in final_cleanup_achievements, "Test achievement should be removed"
+                print(f"✓ Cleanup verified - final achievements: {final_cleanup_achievements}")
+            else:
+                print(f"⚠ Failed to remove test achievement during cleanup")
+        else:
+            print(f"ℹ Test achievement '{test_achievement_name}' not found in student record during cleanup")
+    
     print("✅ All assign-achievement-to-student API tests passed!")
 
 def run_all_tests():
@@ -955,4 +1044,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    test_add_students_api()
+    test_assign_achievement_to_student_api()

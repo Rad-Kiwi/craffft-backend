@@ -634,12 +634,50 @@ def assign_achievement_to_student():
         # Parse the achievement row to handle stringified data
         parsed_achievement = parse_database_row(achievement_row)
         
+        # Get the student's current achievements
+        parsed_student = parse_database_row(student_row)
+        current_achievements = parsed_student.get('achievements', [])
+        
+        # Ensure current_achievements is a list
+        if not isinstance(current_achievements, list):
+            current_achievements = []
+        
+        # Check if achievement is already assigned
+        achievement_name_to_add = parsed_achievement.get('name', achievement_name)
+        if achievement_name_to_add in current_achievements:
+            return jsonify({
+                "message": "Achievement already assigned to student",
+                "websiteId": website_id,
+                "student_name": f"{student_row.get('first_name', '')} {student_row.get('last_name', '')}".strip(),
+                "achievement": parsed_achievement,
+                "already_assigned": True
+            }), 200
+        
+        # Add the achievement to the student's achievements list
+        updated_achievements = current_achievements + [achievement_name_to_add]
+        
+        # Update the student's achievements field in the database
+        success = students_manager.modify_field(
+            column_containing_reference="website_id",
+            reference_value=str(website_id),
+            target_column="achievements",
+            new_value=updated_achievements
+        )
+        
+        if not success:
+            return jsonify({"error": "Failed to update student achievements in database"}), 500
+        
+        # Mark table as modified for Airtable sync
+        multi_manager.mark_table_as_modified("craffft_students")
+        
         # Return success response with the achievement data
         return jsonify({
             "message": "Achievement assigned successfully",
             "websiteId": website_id,
             "student_name": f"{student_row.get('first_name', '')} {student_row.get('last_name', '')}".strip(),
-            "achievement": parsed_achievement
+            "achievement": parsed_achievement,
+            "updated_achievements": updated_achievements,
+            "database_updated": True
         }), 200
         
     except Exception as e:
