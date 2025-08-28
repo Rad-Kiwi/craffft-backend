@@ -105,19 +105,19 @@ class AirtableMultiManager:
             return manager.update_database_from_airtable()
         return None
     
-    def convert_csv_to_json(self, table_name: str):
+    def get_table_as_json(self, table_name: str):
         """
-        Convert CSV to JSON for a specific table.
+        Convert table to parsed JSON data (list of dictionaries) for a specific table.
         
         Args:
             table_name: Name of the table
             
         Returns:
-            JSON data or None if not found
+            List of dictionaries representing table data, or None if not found
         """
         manager = self.get_manager(table_name)
         if manager:
-            return manager.convert_csv_to_json()
+            return manager.get_table_as_json_data()
         return None
     
     def update_all_tables(self) -> Dict[str, str]:
