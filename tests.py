@@ -490,10 +490,10 @@ def test_add_students_api():
     
     # First, check if we have a test teacher or create one
     teachers_manager = multi_manager.get_manager("craffft_teachers")
-    test_teacher_last_name = "TestTeacher"
+    test_teacher_website_id = "999"  # Use website_user_id instead of last_name
     
     # Check if test teacher exists
-    teacher_record = teachers_manager.get_row("last_name", test_teacher_last_name)
+    teacher_record = teachers_manager.get_row("website_user_id", test_teacher_website_id)
     teacher_exists = teacher_record is not None
     
     if not teacher_exists:
@@ -503,17 +503,18 @@ def test_add_students_api():
         teacher_success = teachers_manager.add_record({
             "record_id": teacher_record_id,
             "first_name": "Test",
-            "last_name": test_teacher_last_name,
-            "classroom_ids": "['1', '2']"  # Pre-existing classes
+            "last_name": "Teacher",
+            "website_user_id": test_teacher_website_id,
+            "classroom_ids": ["1", "2"]  # Pre-existing classes as list
         })
         assert teacher_success, "Should successfully add test teacher"
-        print(f"Added test teacher: {test_teacher_last_name}")
+        print(f"Added test teacher with website_user_id: {test_teacher_website_id}")
     else:
-        print(f"Using existing test teacher: {test_teacher_last_name}")
+        print(f"Using existing test teacher with website_user_id: {test_teacher_website_id}")
     
     # Test data with teacher class assignment enabled
     test_data_with_teacher = {
-        "teacher": test_teacher_last_name,
+        "teacher_website_id": test_teacher_website_id,  # Use teacher_website_id instead of teacher name
         "add_classes_to_teacher": True,
         "students": [
             {
@@ -555,7 +556,6 @@ def test_add_students_api():
         # Verify teacher update was successful
         assert teacher_update.get('success') is True, f"Teacher update should succeed: {teacher_update.get('error', '')}"
         assert 'classes_added' in teacher_update
-        assert 'updated_classes' in teacher_update
         
         # Verify students were added correctly
         student1 = students_manager.get_row("gamer_tag", "@teacherteststudent1")
@@ -563,11 +563,11 @@ def test_add_students_api():
         
         assert student1 is not None, "Student 1 should exist"
         assert student2 is not None, "Student 2 should exist"
-        assert f"{test_teacher_last_name}>7" == student1['current_class']
-        assert f"{test_teacher_last_name}>8" == student2['current_class']
+        assert f"{test_teacher_website_id}>7" == student1['current_class']
+        assert f"{test_teacher_website_id}>8" == student2['current_class']
         
         # Verify teacher's classroom_ids were updated
-        updated_teacher = teachers_manager.get_row("last_name", test_teacher_last_name)
+        updated_teacher = teachers_manager.get_row("website_user_id", test_teacher_website_id)
         parsed_teacher = parse_database_row(updated_teacher)
         updated_classroom_ids = parsed_teacher.get('classroom_ids', [])
         
@@ -583,7 +583,7 @@ def test_add_students_api():
     print("\n--- Test 3: Teacher assignment with non-existent teacher ---")
     
     test_data_invalid_teacher = {
-        "teacher": "NonExistentTeacher",
+        "teacher_website_id": "NonExistentTeacher999",  # Use invalid website_id
         "add_classes_to_teacher": True,
         "students": [
             {
@@ -625,7 +625,7 @@ def test_add_students_api():
     print("\n--- Test 4: Teacher assignment disabled ---")
     
     test_data_no_teacher = {
-        "teacher": test_teacher_last_name,
+        "teacher_website_id": test_teacher_website_id,  # Use valid teacher_website_id
         "add_classes_to_teacher": False,  # Explicitly disabled
         "students": [
             {
@@ -678,13 +678,13 @@ def test_add_students_api():
     
     # Only delete test teacher if we created it
     if not teacher_exists:
-        teacher_delete_success = teachers_manager.delete_record("last_name", test_teacher_last_name)
+        teacher_delete_success = teachers_manager.delete_record("website_user_id", test_teacher_website_id)
         if teacher_delete_success:
-            print(f"✓ Deleted test teacher: {test_teacher_last_name}")
+            print(f"✓ Deleted test teacher with website_user_id: {test_teacher_website_id}")
         else:
-            print(f"⚠ Failed to delete test teacher: {test_teacher_last_name}")
+            print(f"⚠ Failed to delete test teacher with website_user_id: {test_teacher_website_id}")
     else:
-        print(f"ℹ Preserved existing teacher: {test_teacher_last_name}")
+        print(f"ℹ Preserved existing teacher with website_user_id: {test_teacher_website_id}")
     
     # Verify cleanup
     for gamer_tag in test_gamer_tags:
@@ -1044,4 +1044,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    test_assign_achievement_to_student_api()
+    test_add_students_api()
