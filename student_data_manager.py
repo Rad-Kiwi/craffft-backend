@@ -1,4 +1,5 @@
 from utilities import parse_database_row, process_quest_data_for_frontend
+import json
 class StudentDataManager:
     def __init__(self, airtable_multi_manager):
         if airtable_multi_manager is None:
@@ -272,6 +273,95 @@ class StudentDataManager:
                 "quest_changed": quest_changed
             }
             
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Unexpected error: {str(e)}"
+            }
+
+    def add_classes_to_teacher(self, teacher_last_name: str, new_classes: set) -> dict:
+        """
+        Add classes to a teacher's classroom_ids field.
+        
+        Args:
+            teacher_last_name: The teacher's last name to search for
+            new_classes: Set of class IDs to add to the teacher's classroom_ids
+            
+        Returns:
+            Dictionary with success status and details
+        """
+        try:
+            # Get the teachers table manager
+            teachers_manager = self.airtable_multi_manager.get_manager("craffft_teachers")
+            if not teachers_manager:
+                return {
+                    "success": False,
+                    "error": "craffft_teachers table not found"
+                }
+            
+            # Find the teacher by last name
+            teacher_row = teachers_manager.get_row("last_name", teacher_last_name)
+            if not teacher_row:
+                return {
+                    "success": False,
+                    "error": f"Teacher with last name '{teacher_last_name}' not found"
+                }
+            
+            # Parse the teacher row to handle stringified data
+            parsed_teacher = parse_database_row(teacher_row)
+            current_classroom_ids = parsed_teacher.get('classroom_ids', [])
+            
+            # Ensure current_classroom_ids is a list
+            if not isinstance(current_classroom_ids, list):
+                current_classroom_ids = []
+            
+            # Convert current_classroom_ids to a set for efficient operations
+            current_classes_set = set(current_classroom_ids)
+            
+            # Convert new_classes to strings (in case they're integers) and create set
+            new_classes_str_set = {str(cls) for cls in new_classes}
+            
+            # Find classes that need to be added (set difference)
+            classes_to_add = new_classes_str_set - current_classes_set
+            
+            if not classes_to_add:
+                return {
+                    "success": True,
+                    "message": "No new classes to add - all classes already exist",
+                    "teacher_name": f"{teacher_row.get('first_name', '')} {teacher_last_name}".strip(),
+                    "current_classes": current_classroom_ids,
+                    "classes_added": []
+                }
+            
+            # Add new classes to the existing list
+            updated_classroom_ids = current_classroom_ids + list(classes_to_add)
+            
+            # The modify_field method will automatically JSON-serialize the list
+            success = teachers_manager.modify_field(
+                column_containing_reference="last_name",
+                reference_value=teacher_last_name,
+                target_column="classroom_ids",
+                new_value=updated_classroom_ids
+            )
+            
+            if success:
+                # Mark table as modified for Airtable sync
+                self.airtable_multi_manager.mark_table_as_modified("craffft_teachers")
+                
+                return {
+                    "success": True,
+                    "message": f"Successfully added {len(classes_to_add)} classes to teacher",
+                    "teacher_name": f"{teacher_row.get('first_name', '')} {teacher_last_name}".strip(),
+                    "classes_added": list(classes_to_add),
+                    "updated_classes": updated_classroom_ids,
+                    "previous_classes": current_classroom_ids
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to update classroom_ids in database"
+                }
+                
         except Exception as e:
             return {
                 "success": False,

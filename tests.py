@@ -435,14 +435,15 @@ def test_update_student_current_step_route():
         assert response.get_json().get("message") == "Student current_step updated successfully"
 
 def test_add_students_api():
-    """Test the /add-students API endpoint with database verification and cleanup."""
-    print("\n=== Testing /add-students API endpoint with database verification ===")
+    """Test the /add-students API endpoint with database verification, cleanup, and teacher class assignment."""
+    print("\n=== Testing /add-students API endpoint with database verification and teacher functionality ===")
     
     multi_manager = AirtableMultiManager.from_environment()
     multi_manager.discover_and_add_tables_from_base()
     
-    # Test student data - format expected by the API
-    test_data = {
+    # Test 1: Basic student addition without teacher functionality
+    print("\n--- Test 1: Basic student addition ---")
+    test_data_basic = {
         "students": [
             {
                 "first_name": "Test",
@@ -454,19 +455,19 @@ def test_add_students_api():
         ]
     }
     
-    # Make POST request to add students
     with app.test_client() as client:
         response = client.post('/add-students', 
-                               data=json.dumps(test_data),
+                               data=json.dumps(test_data_basic),
                                content_type='application/json')
         
-        print(f"Add students response: {response.status_code}")
+        print(f"Basic add students response: {response.status_code}")
         print(f"Response data: {response.get_json()}")
         
         # Verify the response is successful
         assert response.status_code == 201
         response_data = response.get_json()
         assert response_data['added_count'] == 1
+        assert 'teacher_update' not in response_data  # No teacher update requested
         
         # Verify the student was actually added to the database
         students_manager = multi_manager.get_manager("craffft_students")
@@ -480,17 +481,217 @@ def test_add_students_api():
         assert student_record['last_name'] == "Student"
         assert student_record['gamer_tag'] == "@teststudent123"
         assert student_record['website_id'] == "999"  # Stored as string in database
-        assert student_record['current_class'] == "6"  # Stored as string in database
+        assert "6" in student_record['current_class']  # Should contain class 6
         
-        # Cleanup: Delete the test student from the database
-        delete_success = students_manager.delete_record("gamer_tag", "@teststudent123")
-        assert delete_success == True, "Should successfully delete test student"
+        print("✓ Basic student addition test passed")
+    
+    # Test 2: Student addition with teacher class assignment
+    print("\n--- Test 2: Student addition with teacher class assignment ---")
+    
+    # First, check if we have a test teacher or create one
+    teachers_manager = multi_manager.get_manager("craffft_teachers")
+    test_teacher_last_name = "TestTeacher"
+    
+    # Check if test teacher exists
+    teacher_record = teachers_manager.get_row("last_name", test_teacher_last_name)
+    teacher_exists = teacher_record is not None
+    
+    if not teacher_exists:
+        # Add a test teacher
+        import uuid
+        teacher_record_id = f"rec{str(uuid.uuid4()).replace('-', '')[:10]}"
+        teacher_success = teachers_manager.add_record({
+            "record_id": teacher_record_id,
+            "first_name": "Test",
+            "last_name": test_teacher_last_name,
+            "classroom_ids": "['1', '2']"  # Pre-existing classes
+        })
+        assert teacher_success, "Should successfully add test teacher"
+        print(f"Added test teacher: {test_teacher_last_name}")
+    else:
+        print(f"Using existing test teacher: {test_teacher_last_name}")
+    
+    # Test data with teacher class assignment enabled
+    test_data_with_teacher = {
+        "teacher": test_teacher_last_name,
+        "add_classes_to_teacher": True,
+        "students": [
+            {
+                "first_name": "TeacherTest",
+                "last_name": "Student1",
+                "gamer_tag": "@teacherteststudent1",
+                "website_id": 997,
+                "current_class": 7  # New class that teacher might not have
+            },
+            {
+                "first_name": "TeacherTest",
+                "last_name": "Student2", 
+                "gamer_tag": "@teacherteststudent2",
+                "website_id": 996,
+                "current_class": 8  # Another new class
+            }
+        ]
+    }
+    
+    with app.test_client() as client:
+        response = client.post('/add-students',
+                               data=json.dumps(test_data_with_teacher),
+                               content_type='application/json')
         
-        # Verify the student was actually deleted
-        deleted_record = students_manager.get_row("gamer_tag", "@teststudent123")
-        assert deleted_record is None, "Student record should be deleted from database"
+        print(f"Teacher assignment response: {response.status_code}")
+        response_data = response.get_json()
+        print(f"Response data: {response_data}")
         
-        print("✓ Student API test completed with database verification and cleanup")
+        # Verify the response is successful
+        assert response.status_code == 201
+        assert response_data['added_count'] == 2
+        
+        # Verify teacher update information is included
+        assert 'teacher_update' in response_data, "Response should include teacher update info"
+        teacher_update = response_data['teacher_update']
+        
+        print(f"Teacher update result: {teacher_update}")
+        
+        # Verify teacher update was successful
+        assert teacher_update.get('success') is True, f"Teacher update should succeed: {teacher_update.get('error', '')}"
+        assert 'classes_added' in teacher_update
+        assert 'updated_classes' in teacher_update
+        
+        # Verify students were added correctly
+        student1 = students_manager.get_row("gamer_tag", "@teacherteststudent1")
+        student2 = students_manager.get_row("gamer_tag", "@teacherteststudent2")
+        
+        assert student1 is not None, "Student 1 should exist"
+        assert student2 is not None, "Student 2 should exist"
+        assert f"{test_teacher_last_name}>7" == student1['current_class']
+        assert f"{test_teacher_last_name}>8" == student2['current_class']
+        
+        # Verify teacher's classroom_ids were updated
+        updated_teacher = teachers_manager.get_row("last_name", test_teacher_last_name)
+        parsed_teacher = parse_database_row(updated_teacher)
+        updated_classroom_ids = parsed_teacher.get('classroom_ids', [])
+        
+        print(f"Updated teacher classroom_ids: {updated_classroom_ids}")
+        
+        # Should include the new classes 7 and 8
+        assert "7" in updated_classroom_ids, "Teacher should have class 7"
+        assert "8" in updated_classroom_ids, "Teacher should have class 8"
+        
+        print("✓ Teacher class assignment test passed")
+    
+    # Test 3: Teacher assignment with non-existent teacher
+    print("\n--- Test 3: Teacher assignment with non-existent teacher ---")
+    
+    test_data_invalid_teacher = {
+        "teacher": "NonExistentTeacher",
+        "add_classes_to_teacher": True,
+        "students": [
+            {
+                "first_name": "Invalid",
+                "last_name": "TeacherTest",
+                "gamer_tag": "@invalidteachertest",
+                "website_id": 995,
+                "current_class": 9
+            }
+        ]
+    }
+    
+    with app.test_client() as client:
+        response = client.post('/add-students',
+                               data=json.dumps(test_data_invalid_teacher),
+                               content_type='application/json')
+        
+        print(f"Invalid teacher response: {response.status_code}")
+        response_data = response.get_json()
+        print(f"Response data: {response_data}")
+        
+        # Students should still be added even if teacher update fails
+        assert response.status_code == 201
+        assert response_data['added_count'] == 1
+        
+        # Teacher update should have failed
+        assert 'teacher_update' in response_data
+        teacher_update = response_data['teacher_update']
+        assert teacher_update.get('success') is False
+        assert "not found" in teacher_update.get('error', '').lower()
+        
+        # Verify student was still added
+        invalid_student = students_manager.get_row("gamer_tag", "@invalidteachertest")
+        assert invalid_student is not None, "Student should still be added even if teacher update fails"
+        
+        print("✓ Invalid teacher test passed")
+    
+    # Test 4: Teacher assignment disabled
+    print("\n--- Test 4: Teacher assignment disabled ---")
+    
+    test_data_no_teacher = {
+        "teacher": test_teacher_last_name,
+        "add_classes_to_teacher": False,  # Explicitly disabled
+        "students": [
+            {
+                "first_name": "NoTeacher",
+                "last_name": "Test",
+                "gamer_tag": "@noteachertest",
+                "website_id": 994,
+                "current_class": 10
+            }
+        ]
+    }
+    
+    with app.test_client() as client:
+        response = client.post('/add-students',
+                               data=json.dumps(test_data_no_teacher),
+                               content_type='application/json')
+        
+        print(f"No teacher update response: {response.status_code}")
+        response_data = response.get_json()
+        print(f"Response data: {response_data}")
+        
+        # Should succeed but without teacher update
+        assert response.status_code == 201
+        assert response_data['added_count'] == 1
+        assert 'teacher_update' not in response_data, "Should not include teacher update when disabled"
+        
+        # Verify student was added
+        no_teacher_student = students_manager.get_row("gamer_tag", "@noteachertest")
+        assert no_teacher_student is not None, "Student should be added"
+        
+        print("✓ Disabled teacher assignment test passed")
+    
+    # Cleanup: Delete all test students and teacher
+    print("\n--- Cleanup ---")
+    
+    test_gamer_tags = [
+        "@teststudent123",
+        "@teacherteststudent1", 
+        "@teacherteststudent2",
+        "@invalidteachertest",
+        "@noteachertest"
+    ]
+    
+    for gamer_tag in test_gamer_tags:
+        delete_success = students_manager.delete_record("gamer_tag", gamer_tag)
+        if delete_success:
+            print(f"✓ Deleted test student: {gamer_tag}")
+        else:
+            print(f"⚠ Failed to delete test student: {gamer_tag}")
+    
+    # Only delete test teacher if we created it
+    if not teacher_exists:
+        teacher_delete_success = teachers_manager.delete_record("last_name", test_teacher_last_name)
+        if teacher_delete_success:
+            print(f"✓ Deleted test teacher: {test_teacher_last_name}")
+        else:
+            print(f"⚠ Failed to delete test teacher: {test_teacher_last_name}")
+    else:
+        print(f"ℹ Preserved existing teacher: {test_teacher_last_name}")
+    
+    # Verify cleanup
+    for gamer_tag in test_gamer_tags:
+        deleted_record = students_manager.get_row("gamer_tag", gamer_tag)
+        assert deleted_record is None, f"Student {gamer_tag} should be deleted from database"
+    
+    print("✅ Add students API test with teacher functionality completed successfully!")
 
 def test_assign_quests_api():
     """Test the /assign-quests API endpoint with database verification and cleanup."""
@@ -610,6 +811,217 @@ def test_assign_quests_api():
         
         print("✓ Quest assignment API test completed with database verification and cleanup")
 
+def test_assign_achievement_to_student_api():
+    """Test the /assign-achievement-to-student API endpoint with database verification."""
+    print("\n=== Testing /assign-achievement-to-student API endpoint ===")
+    
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    
+    # Test parameters
+    test_website_id = 9
+    test_achievement_name = "test badge"
+    
+    print(f"Testing achievement assignment for student websiteId: {test_website_id}, achievement: '{test_achievement_name}'")
+    
+    # Verify the student exists
+    students_manager = multi_manager.get_manager("craffft_students")
+    student_record = students_manager.get_row("website_id", str(test_website_id))
+    
+    if not student_record:
+        print(f"Warning: Student with websiteId {test_website_id} not found. Skipping test.")
+        return
+    
+    print(f"Found student: {student_record.get('first_name', '')} {student_record.get('last_name', '')}")
+    
+    # Verify the achievement exists
+    achievements_manager = multi_manager.get_manager("craffft_achievements")
+    achievement_record = achievements_manager.get_row("name", test_achievement_name)
+    
+    if not achievement_record:
+        print(f"Warning: Achievement '{test_achievement_name}' not found. Skipping test.")
+        return
+    
+    print(f"Found achievement: {achievement_record.get('name', '')} - {achievement_record.get('description', '')}")
+    
+    # Test 1: POST with JSON body
+    test_data = {
+        "websiteId": test_website_id,
+        "achievement_name": test_achievement_name
+    }
+    
+    # Get initial achievements state for comparison
+    initial_student_data = parse_database_row(student_record)
+    initial_achievements = initial_student_data.get('achievements', [])
+    print(f"Initial achievements: {initial_achievements}")
+    
+    with app.test_client() as client:
+        response = client.post('/assign-achievement-to-student', 
+                               data=json.dumps(test_data),
+                               content_type='application/json')
+        
+        print(f"POST response: {response.status_code}")
+        print(f"Response data: {response.get_json()}")
+        
+        # Verify successful response
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        response_data = response.get_json()
+        
+        assert response_data['message'] == "Achievement assigned successfully"
+        assert response_data['websiteId'] == test_website_id
+        assert 'student_name' in response_data
+        assert 'achievement' in response_data
+        assert 'updated_achievements' in response_data
+        assert response_data['database_updated'] is True
+        
+        # Verify achievement data is returned
+        achievement_data = response_data['achievement']
+        assert achievement_data['name'] == test_achievement_name
+        assert 'description' in achievement_data or 'badge' in achievement_data
+        
+        # CRITICAL: Verify the achievement was actually saved to the database
+        updated_student_record = students_manager.get_row("website_id", str(test_website_id))
+        assert updated_student_record is not None, "Student record should still exist"
+        
+        updated_student_data = parse_database_row(updated_student_record)
+        updated_achievements = updated_student_data.get('achievements', [])
+        
+        print(f"Updated achievements in database: {updated_achievements}")
+        
+        # Verify the achievement was added to the database
+        assert isinstance(updated_achievements, list), "Achievements should be a list"
+        assert test_achievement_name in updated_achievements, f"Achievement '{test_achievement_name}' should be in database"
+        
+        # Verify the response matches what's in the database
+        response_achievements = response_data['updated_achievements']
+        assert updated_achievements == response_achievements, "Database achievements should match response"
+        
+        # Verify it's one more achievement than before
+        expected_count = len(initial_achievements) + 1
+        assert len(updated_achievements) == expected_count, f"Should have {expected_count} achievements, got {len(updated_achievements)}"
+        
+        print(f"✓ POST test passed - Achievement: {achievement_data.get('name')} successfully saved to database")
+        
+        # Test duplicate assignment - should not add again
+        print("\n--- Testing duplicate achievement assignment ---")
+        response2 = client.post('/assign-achievement-to-student', 
+                               data=json.dumps(test_data),
+                               content_type='application/json')
+        
+        print(f"Duplicate assignment response: {response2.status_code}")
+        response2_data = response2.get_json()
+        print(f"Duplicate assignment response data: {response2_data}")
+        
+        # Should return success but indicate already assigned
+        assert response2.status_code == 200
+        assert response2_data['message'] == "Achievement already assigned to student"
+        assert response2_data['already_assigned'] is True
+        
+        # Verify no duplicate was added to database
+        final_student_record = students_manager.get_row("website_id", str(test_website_id))
+        final_student_data = parse_database_row(final_student_record)
+        final_achievements = final_student_data.get('achievements', [])
+        
+        print(f"Final achievements after duplicate attempt: {final_achievements}")
+        
+        # Should be same as before (no duplicate added)
+        assert len(final_achievements) == expected_count, "Duplicate should not be added"
+        assert final_achievements == updated_achievements, "Achievements list should remain unchanged"
+        
+        print("✓ Duplicate assignment test passed - no duplicate added to database")
+    
+    # Test 2: Invalid student ID
+    invalid_data = {
+        "websiteId": 99999,  # Non-existent student
+        "achievement_name": test_achievement_name
+    }
+    
+    with app.test_client() as client:
+        response = client.post('/assign-achievement-to-student',
+                               data=json.dumps(invalid_data),
+                               content_type='application/json')
+        
+        print(f"Invalid student test response: {response.status_code}")
+        
+        assert response.status_code == 404, f"Expected 404 for invalid student, got {response.status_code}"
+        response_data = response.get_json()
+        assert "not found" in response_data['error'].lower()
+        
+        print("✓ Invalid student test passed")
+    
+    # Test 3: Invalid achievement name
+    invalid_achievement_data = {
+        "websiteId": test_website_id,
+        "achievement_name": "Non-existent Achievement"
+    }
+    
+    with app.test_client() as client:
+        response = client.post('/assign-achievement-to-student',
+                               data=json.dumps(invalid_achievement_data),
+                               content_type='application/json')
+        
+        print(f"Invalid achievement test response: {response.status_code}")
+        
+        assert response.status_code == 404, f"Expected 404 for invalid achievement, got {response.status_code}"
+        response_data = response.get_json()
+        assert "not found" in response_data['error'].lower()
+        
+        print("✓ Invalid achievement test passed")
+    
+    # Test 4: Missing parameters
+    missing_data = {
+        "websiteId": test_website_id
+        # Missing achievement_name
+    }
+    
+    with app.test_client() as client:
+        response = client.post('/assign-achievement-to-student',
+                               data=json.dumps(missing_data),
+                               content_type='application/json')
+        
+        print(f"Missing parameters test response: {response.status_code}")
+        
+        assert response.status_code == 400, f"Expected 400 for missing parameters, got {response.status_code}"
+        response_data = response.get_json()
+        assert "missing required parameters" in response_data['error'].lower()
+        
+        print("✓ Missing parameters test passed")
+    
+    # Cleanup: Remove the test achievement from the student's record
+    print("\n--- Cleanup: Removing test achievement ---")
+    cleanup_student_record = students_manager.get_row("website_id", str(test_website_id))
+    if cleanup_student_record:
+        cleanup_student_data = parse_database_row(cleanup_student_record)
+        cleanup_achievements = cleanup_student_data.get('achievements', [])
+        
+        if test_achievement_name in cleanup_achievements:
+            # Remove the test achievement
+            updated_cleanup_achievements = [ach for ach in cleanup_achievements if ach != test_achievement_name]
+            
+            cleanup_success = students_manager.modify_field(
+                column_containing_reference="website_id",
+                reference_value=str(test_website_id),
+                target_column="achievements",
+                new_value=updated_cleanup_achievements
+            )
+            
+            if cleanup_success:
+                print(f"✓ Successfully removed test achievement '{test_achievement_name}' from student record")
+                
+                # Verify cleanup
+                final_cleanup_record = students_manager.get_row("website_id", str(test_website_id))
+                final_cleanup_data = parse_database_row(final_cleanup_record)
+                final_cleanup_achievements = final_cleanup_data.get('achievements', [])
+                
+                assert test_achievement_name not in final_cleanup_achievements, "Test achievement should be removed"
+                print(f"✓ Cleanup verified - final achievements: {final_cleanup_achievements}")
+            else:
+                print(f"⚠ Failed to remove test achievement during cleanup")
+        else:
+            print(f"ℹ Test achievement '{test_achievement_name}' not found in student record during cleanup")
+    
+    print("✅ All assign-achievement-to-student API tests passed!")
+
 def run_all_tests():
     import sys
     import types
@@ -632,4 +1044,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    test_assign_quests_api()
+    test_assign_achievement_to_student_api()

@@ -359,6 +359,8 @@ def add_students():
     
     Expected JSON format:
     {
+        "teacher": "Smith",
+        "add_classes_to_teacher": true,
         "students": [
             {
                 "first_name": "John",
@@ -375,7 +377,9 @@ def add_students():
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
-        
+
+        teacher_name = data.get('teacher', '')
+        add_classes_to_teacher = data.get('add_classes_to_teacher', False)
         students_list = data.get('students', [])
         if not students_list:
             return jsonify({"error": "Missing 'students' array in request"}), 400
@@ -433,7 +437,7 @@ def add_students():
                     'last_name': student['last_name'].strip(),
                     'gamer_tag': student['gamer_tag'].strip(),
                     'website_id': str(student['website_id']),  # Convert int to string for database
-                    'current_class': str(student['current_class']),  # Convert int to string for database
+                    'current_class': f"{teacher_name}>{str(student['current_class'])}",  # Convert int to string for database
                     # Set default values for other fields based on your table structure
                     'current_quest': student.get('current_quest', ''),
                     'current_step': student.get('current_step', ''),
@@ -469,6 +473,21 @@ def add_students():
         if added_students:
             multi_manager.mark_table_as_modified("craffft_students")
         
+        # Add classes to teacher if requested and students were successfully added
+        teacher_update_result = None
+        if add_classes_to_teacher and teacher_name and added_students and student_data_manager:
+            # Collect unique class IDs from successfully added students
+            class_ids = set()
+            for student in students_list:
+                if 'current_class' in student:
+                    class_ids.add(str(student['current_class']))
+            
+            if class_ids:
+                teacher_update_result = student_data_manager.add_classes_to_teacher(
+                    teacher_last_name=teacher_name,
+                    new_classes=class_ids
+                )
+        
         # Prepare response
         response_data = {
             "message": f"Processed {len(students_list)} students",
@@ -479,6 +498,10 @@ def add_students():
         
         if failed_students:
             response_data["failed_students"] = failed_students
+        
+        # Add teacher update information to response if applicable
+        if teacher_update_result:
+            response_data["teacher_update"] = teacher_update_result
         
         status_code = 201 if len(added_students) > 0 else 400
         return jsonify(response_data), status_code
@@ -554,6 +577,111 @@ def assign_quests():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/assign-achievement-to-student", methods=['POST'])
+def assign_achievement_to_student():
+    """
+    Assign an achievement to a student.
+    
+    Expected JSON format:
+    {
+        "websiteId": 12345,
+        "achievement_name": "First Quest Complete"
+    }
+    
+    Or use query parameters: /assign-achievement-to-student?websiteId=12345&achievement_name=First Quest Complete
+    """
+    try:
+        # Get parameters from JSON body or query parameters
+        website_id = None
+        achievement_name = None
+        
+        if request.is_json:
+            data = request.get_json()
+            if data:
+                website_id = data.get('websiteId')
+                achievement_name = data.get('achievement_name')
+        
+        if not website_id:
+            website_id = request.args.get('websiteId')
+        if not achievement_name:
+            achievement_name = request.args.get('achievement_name')
+        
+        if not website_id or not achievement_name:
+            return jsonify({"error": "Missing required parameters: websiteId and achievement_name"}), 400
+        
+        # Get the achievements table manager
+        achievements_manager = multi_manager.get_manager("craffft_achievements")
+        if not achievements_manager:
+            return jsonify({"error": "craffft_achievements table not found"}), 404
+        
+        # Look up the achievement by name
+        achievement_row = achievements_manager.get_row("name", achievement_name)
+        if not achievement_row:
+            return jsonify({"error": f"Achievement '{achievement_name}' not found"}), 404
+        
+        # Get the students table manager
+        students_manager = multi_manager.get_manager("craffft_students")
+        if not students_manager:
+            return jsonify({"error": "craffft_students table not found"}), 404
+        
+        # Verify the student exists
+        student_row = students_manager.get_row("website_id", str(website_id))
+        if not student_row:
+            return jsonify({"error": f"Student with websiteId {website_id} not found"}), 404
+        
+        # Parse the achievement row to handle stringified data
+        parsed_achievement = parse_database_row(achievement_row)
+        
+        # Get the student's current achievements
+        parsed_student = parse_database_row(student_row)
+        current_achievements = parsed_student.get('achievements', [])
+        
+        # Ensure current_achievements is a list
+        if not isinstance(current_achievements, list):
+            current_achievements = []
+        
+        # Check if achievement is already assigned
+        achievement_name_to_add = parsed_achievement.get('name', achievement_name)
+        if achievement_name_to_add in current_achievements:
+            return jsonify({
+                "message": "Achievement already assigned to student",
+                "websiteId": website_id,
+                "student_name": f"{student_row.get('first_name', '')} {student_row.get('last_name', '')}".strip(),
+                "achievement": parsed_achievement,
+                "already_assigned": True
+            }), 200
+        
+        # Add the achievement to the student's achievements list
+        updated_achievements = current_achievements + [achievement_name_to_add]
+        
+        # Update the student's achievements field in the database
+        success = students_manager.modify_field(
+            column_containing_reference="website_id",
+            reference_value=str(website_id),
+            target_column="achievements",
+            new_value=updated_achievements
+        )
+        
+        if not success:
+            return jsonify({"error": "Failed to update student achievements in database"}), 500
+        
+        # Mark table as modified for Airtable sync
+        multi_manager.mark_table_as_modified("craffft_students")
+        
+        # Return success response with the achievement data
+        return jsonify({
+            "message": "Achievement assigned successfully",
+            "websiteId": website_id,
+            "student_name": f"{student_row.get('first_name', '')} {student_row.get('last_name', '')}".strip(),
+            "achievement": parsed_achievement,
+            "updated_achievements": updated_achievements,
+            "database_updated": True
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
 @app.route("/upload-to-airtable", methods=['POST'])
