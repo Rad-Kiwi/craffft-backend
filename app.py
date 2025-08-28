@@ -359,7 +359,7 @@ def add_students():
     
     Expected JSON format:
     {
-        "teacher": "Smith",
+        "teacher_website_id": "123",
         "add_classes_to_teacher": true,
         "students": [
             {
@@ -378,7 +378,7 @@ def add_students():
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
-        teacher_name = data.get('teacher', '')
+        teacher_website_id = data.get('teacher_website_id', '')
         add_classes_to_teacher = data.get('add_classes_to_teacher', False)
         students_list = data.get('students', [])
         if not students_list:
@@ -437,7 +437,7 @@ def add_students():
                     'last_name': student['last_name'].strip(),
                     'gamer_tag': student['gamer_tag'].strip(),
                     'website_id': str(student['website_id']),  # Convert int to string for database
-                    'current_class': f"{teacher_name}>{str(student['current_class'])}",  # Convert int to string for database
+                    'current_class': f"{teacher_website_id}>{str(student['current_class'])}",  # Use teacher_website_id instead of name
                     # Set default values for other fields based on your table structure
                     'current_quest': student.get('current_quest', ''),
                     'current_step': student.get('current_step', ''),
@@ -475,7 +475,7 @@ def add_students():
         
         # Add classes to teacher if requested and students were successfully added
         teacher_update_result = None
-        if add_classes_to_teacher and teacher_name and added_students and student_data_manager:
+        if add_classes_to_teacher and teacher_website_id and added_students and student_data_manager:
             # Collect unique class IDs from successfully added students
             class_ids = set()
             for student in students_list:
@@ -483,8 +483,8 @@ def add_students():
                     class_ids.add(str(student['current_class']))
             
             if class_ids:
-                teacher_update_result = student_data_manager.add_classes_to_teacher(
-                    teacher_last_name=teacher_name,
+                teacher_update_result = student_data_manager.add_classes_to_teacher_by_website_id(
+                    teacher_website_id=teacher_website_id,
                     new_classes=class_ids
                 )
         

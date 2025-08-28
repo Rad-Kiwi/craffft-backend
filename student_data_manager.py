@@ -279,12 +279,12 @@ class StudentDataManager:
                 "error": f"Unexpected error: {str(e)}"
             }
 
-    def add_classes_to_teacher(self, teacher_last_name: str, new_classes: set) -> dict:
+    def add_classes_to_teacher_by_website_id(self, teacher_website_id: str, new_classes: set) -> dict:
         """
-        Add classes to a teacher's classroom_ids field.
+        Add classes to a teacher's classroom_ids field using their website_user_id.
         
         Args:
-            teacher_last_name: The teacher's last name to search for
+            teacher_website_id: The teacher's website_user_id to search for
             new_classes: Set of class IDs to add to the teacher's classroom_ids
             
         Returns:
@@ -299,12 +299,12 @@ class StudentDataManager:
                     "error": "craffft_teachers table not found"
                 }
             
-            # Find the teacher by last name
-            teacher_row = teachers_manager.get_row("last_name", teacher_last_name)
+            # Find the teacher by website_user_id
+            teacher_row = teachers_manager.get_row("website_user_id", teacher_website_id)
             if not teacher_row:
                 return {
                     "success": False,
-                    "error": f"Teacher with last name '{teacher_last_name}' not found"
+                    "error": f"Teacher with website_user_id '{teacher_website_id}' not found"
                 }
             
             # Parse the teacher row to handle stringified data
@@ -328,7 +328,8 @@ class StudentDataManager:
                 return {
                     "success": True,
                     "message": "No new classes to add - all classes already exist",
-                    "teacher_name": f"{teacher_row.get('first_name', '')} {teacher_last_name}".strip(),
+                    "teacher_name": f"{teacher_row.get('first_name', '')} {teacher_row.get('last_name', '')}".strip(),
+                    "teacher_website_id": teacher_website_id,
                     "current_classes": current_classroom_ids,
                     "classes_added": []
                 }
@@ -336,10 +337,10 @@ class StudentDataManager:
             # Add new classes to the existing list
             updated_classroom_ids = current_classroom_ids + list(classes_to_add)
             
-            # The modify_field method will automatically JSON-serialize the list
+            # Update the teacher's classroom_ids field in the database
             success = teachers_manager.modify_field(
-                column_containing_reference="last_name",
-                reference_value=teacher_last_name,
+                column_containing_reference="website_user_id",
+                reference_value=teacher_website_id,
                 target_column="classroom_ids",
                 new_value=updated_classroom_ids
             )
@@ -351,7 +352,8 @@ class StudentDataManager:
                 return {
                     "success": True,
                     "message": f"Successfully added {len(classes_to_add)} classes to teacher",
-                    "teacher_name": f"{teacher_row.get('first_name', '')} {teacher_last_name}".strip(),
+                    "teacher_name": f"{teacher_row.get('first_name', '')} {teacher_row.get('last_name', '')}".strip(),
+                    "teacher_website_id": teacher_website_id,
                     "classes_added": list(classes_to_add),
                     "updated_classes": updated_classroom_ids,
                     "previous_classes": current_classroom_ids
