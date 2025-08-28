@@ -151,10 +151,12 @@ def update_table_from_airtable():
 
 @app.route("/get-table-as-json/<table_name>", methods=['GET'])
 def get_tile_data(table_name):
-    json_data = multi_manager.convert_csv_to_json(table_name)
+    json_data = multi_manager.get_table_as_json(table_name)
     if not json_data:
         return Response(f"No data found for table: {table_name}", status=404)
     return jsonify(json_data)
+
+
 
 @app.route("/get-student-data-from-websiteId/<website_id>", methods=['GET'])
 def get_student_data_from_website(website_id):
@@ -251,6 +253,54 @@ def get_teacher_data(id):
         return Response(f"No data found for teacher_id: {id}", status=404)
 
     return jsonify(teacher_info)
+
+
+@app.route("/get-step-data", methods=['GET'])
+def get_step_data():
+    """
+    Get step data from craffft_steps table.
+    
+    Query parameters:
+        step (optional): Name of specific step to retrieve. If not provided, returns all steps.
+    
+    Returns:
+        - If step parameter provided: Single step data as JSON
+        - If no parameter: All steps data as JSON array
+    """
+    try:
+        # Get the steps table manager
+        steps_manager = multi_manager.get_manager("craffft_steps")
+        if not steps_manager:
+            return jsonify({"error": "craffft_steps table not found"}), 404
+        
+        # Get step parameter from query string
+        step_name = request.args.get('step')
+        
+        if step_name:
+            # Return specific step by name
+            step_row = steps_manager.get_row("name", step_name)
+            if not step_row:
+                return jsonify({"error": f"Step '{step_name}' not found"}), 404
+            
+            # Parse the step row to handle stringified data
+            parsed_step = parse_database_row(step_row)
+            return jsonify(parsed_step), 200
+        else:
+            # Return all steps
+            json_data = multi_manager.get_table_as_json("craffft_steps")
+            if not json_data:
+                return jsonify({"error": "No step data found"}), 404
+            
+            # Parse all steps to handle stringified data
+            parsed_steps = []
+            for step in json_data:
+                parsed_step = parse_database_row(step)
+                parsed_steps.append(parsed_step)
+            
+            return jsonify(parsed_steps), 200
+            
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
 @app.route("/modify-field", methods=['POST'])

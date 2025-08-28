@@ -1022,6 +1022,120 @@ def test_assign_achievement_to_student_api():
     
     print("✅ All assign-achievement-to-student API tests passed!")
 
+def test_get_step_data_api():
+    """Test the /get-step-data API endpoint."""
+    print("\n=== Testing /get-step-data API endpoint ===")
+    
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    
+    # Verify steps table exists and has data
+    steps_manager = multi_manager.get_manager("craffft_steps")
+    if not steps_manager:
+        print("Warning: craffft_steps table not found. Skipping test.")
+        return
+    
+    # Get sample step data for testing
+    all_steps_data = multi_manager.get_table_as_json("craffft_steps")
+    if not all_steps_data or len(all_steps_data) == 0:
+        print("Warning: No steps data found. Skipping test.")
+        return
+    
+    # Use first step for specific step testing
+    test_step = all_steps_data[0]
+    test_step_name = test_step.get('name', '')
+    
+    if not test_step_name:
+        print("Warning: First step has no name field. Skipping test.")
+        return
+    
+    print(f"Using test step: '{test_step_name}'")
+    
+    with app.test_client() as client:
+        # Test 1: Get all steps
+        print("\n--- Test 1: Get all steps ---")
+        response = client.get('/get-step-data')
+        
+        print(f"Get all steps response: {response.status_code}")
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        response_data = response.get_json()
+        
+        # Verify response is a list
+        assert isinstance(response_data, list), "Response should be a list of steps"
+        assert len(response_data) > 0, "Should return at least one step"
+
+        print(response_data)
+
+        # Verify each step has expected fields
+        for step in response_data:
+            assert isinstance(step, dict), "Each step should be a dictionary"
+            assert 'record_id' in step or 'name' in step, "Step should have record_id or name field"
+        
+        print(f"✓ Returned {len(response_data)} steps successfully")
+        
+        # Test 2: Get specific step by name
+        print(f"\n--- Test 2: Get specific step '{test_step_name}' ---")
+        response = client.get(f'/get-step-data?step={test_step_name}')
+        
+        print(f"Get specific step response: {response.status_code}")
+        
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        response_data = response.get_json()
+        
+        # Verify response is a single step object
+        assert isinstance(response_data, dict), "Response should be a single step dictionary"
+        assert response_data.get('name') == test_step_name, f"Step name should match '{test_step_name}'"
+        
+        # Verify step has expected structure
+        expected_fields = ['record_id', 'name']
+        for field in expected_fields:
+            if field in test_step:  # Only check fields that exist in original data
+                assert field in response_data, f"Step should have '{field}' field"
+        
+        print(f"✓ Retrieved specific step '{test_step_name}' successfully")
+        print(f"Step details: {response_data}")
+        
+        # Test 3: Get non-existent step
+        print("\n--- Test 3: Get non-existent step ---")
+        non_existent_step = "NonExistentStep12345"
+        response = client.get(f'/get-step-data?step={non_existent_step}')
+        
+        print(f"Non-existent step response: {response.status_code}")
+        
+        assert response.status_code == 404, f"Expected 404 for non-existent step, got {response.status_code}"
+        response_data = response.get_json()
+        assert 'error' in response_data, "Response should contain error message"
+        assert "not found" in response_data['error'].lower(), "Error should indicate step not found"
+        
+        print(f"✓ Non-existent step test passed: {response_data['error']}")
+        
+        # Test 5: Verify data consistency between all steps and specific step
+        print(f"\n--- Test 5: Data consistency check ---")
+        all_steps_response = client.get('/get-step-data')
+        all_steps = all_steps_response.get_json()
+        
+        specific_step_response = client.get(f'/get-step-data?step={test_step_name}')
+        specific_step = specific_step_response.get_json()
+        
+        # Find the matching step in all_steps
+        matching_step = None
+        for step in all_steps:
+            if step.get('name') == test_step_name:
+                matching_step = step
+                break
+        
+        assert matching_step is not None, f"Step '{test_step_name}' should be found in all steps"
+        
+        # Compare key fields
+        for key in ['record_id', 'name']:
+            if key in matching_step and key in specific_step:
+                assert matching_step[key] == specific_step[key], f"Field '{key}' should match between all steps and specific step"
+        
+        print("✓ Data consistency check passed")
+    
+    print("✅ All get-step-data API tests passed!")
+
 def run_all_tests():
     import sys
     import types
@@ -1044,4 +1158,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    test_add_students_api()
+    test_get_step_data_api()

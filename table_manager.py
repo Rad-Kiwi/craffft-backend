@@ -5,7 +5,7 @@ import io
 import json
 from typing import Optional
 from sqlite_storage import SQLiteStorage
-from utilities import convert_value_for_airtable
+from utilities import convert_value_for_airtable, parse_database_row
 
 class TableManager:
     def __init__(self, base_id, table_name, api_key, sqlite_storage: Optional[SQLiteStorage] = None):
@@ -221,4 +221,59 @@ class TableManager:
             return records if records else []
         except Exception as e:
             print(f"Error getting full table {self.table_name}: {e}")
+            return []
+
+    def get_table_as_json(self):
+        """
+        Convert the entire table to JSON format.
+        
+        Returns:
+            JSON string representation of all table records, or None if error
+        """
+        if not self.sqlite_storage:
+            return None
+            
+        try:
+            # Get all records from the table
+            records = self.get_full_table()
+            
+            if records is None:
+                return None
+                
+            # Convert to JSON string
+            json_string = json.dumps(records, indent=2, default=str)
+            return json_string
+            
+        except Exception as e:
+            print(f"Error converting table {self.table_name} to JSON: {e}")
+            return None
+
+    def get_table_as_json_data(self):
+        """
+        Get the entire table as Python data structures (list of dicts).
+        Uses parse_database_row to handle stringified JSON data properly.
+        
+        Returns:
+            List of dictionaries representing table records, or empty list if error
+        """
+        if not self.sqlite_storage:
+            return []
+            
+        try:
+            # Get all records from the table
+            raw_records = self.get_full_table()
+            
+            if not raw_records:
+                return []
+            
+            # Parse each record to handle stringified JSON data
+            parsed_records = []
+            for record in raw_records:
+                parsed_record = parse_database_row(record)
+                parsed_records.append(parsed_record)
+            
+            return parsed_records
+            
+        except Exception as e:
+            print(f"Error getting table {self.table_name} as JSON data: {e}")
             return []
