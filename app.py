@@ -398,7 +398,8 @@ def update_and_check_quest():
     return jsonify({
         "current_step": result["current_step"],
         "current_quest": result["current_quest"],
-        "quest_changed": result["quest_changed"]
+        "quest_changed": result["quest_changed"],
+        "quest_completed": result.get("quest_completed", False)
     })
 
 
