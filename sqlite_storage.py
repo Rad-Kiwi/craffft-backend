@@ -384,3 +384,24 @@ class SQLiteStorage:
             print(f"Error checking database data: {e}")
             # If we can't check, assume empty to trigger initial sync
             return False
+
+    def delete_table(self, table_name: str) -> bool:
+        """
+        Delete/drop a table from the database.
+        
+        Args:
+            table_name: Name of the table to delete
+            
+        Returns:
+            bool: True if table was deleted successfully, False otherwise
+        """
+        try:
+            with self.engine.connect() as conn:
+                # Use double quotes to handle table names with special characters
+                conn.execute(text(f'DROP TABLE IF EXISTS "{table_name}"'))
+                conn.commit()
+                print(f"Successfully deleted table: {table_name}")
+                return True
+        except Exception as e:
+            print(f"Error deleting table {table_name}: {e}")
+            return False
