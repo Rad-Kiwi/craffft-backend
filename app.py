@@ -111,20 +111,27 @@ def update_table_from_airtable():
     
     Expected JSON format:
     {
-        "table_name": "craffft_students"  // Required
+        "table_name": "craffft_students",  // Required
+        "force_delete": true  // Optional, defaults to true
     }
     
-    Or use query parameter: /update-table-from-airtable?table_name=craffft_students
+    Or use query parameters: /update-table-from-airtable?table_name=craffft_students&force_delete=true
     """
     try:
         # Get table name from JSON body or query parameter
         table_name = None
+        force_delete = True  # Default to true for safety
+        
         if request.is_json:
             data = request.get_json()
-            table_name = data.get('table_name') if data else None
+            if data:
+                table_name = data.get('table_name')
+                force_delete = data.get('force_delete', True)  # Default to True
         
         if not table_name:
             table_name = request.args.get('table_name')
+        if request.args.get('force_delete') is not None:
+            force_delete = request.args.get('force_delete', 'true').lower() == 'true'
         
         if table_name:
             # Update specific table
@@ -132,12 +139,17 @@ def update_table_from_airtable():
             if not manager:
                 return jsonify({"error": f"Table '{table_name}' not found"}), 404
             
-            result = manager.update_database_from_airtable()
+            result = manager.update_database_from_airtable(force_delete=force_delete)
             
             if result and not str(result).startswith("Error"):
+                response_message = f"Table '{table_name}' updated successfully from Airtable"
+                if force_delete:
+                    response_message += " (table was deleted and recreated)"
+                    
                 return jsonify({
-                    "message": f"Table '{table_name}' updated successfully from Airtable",
+                    "message": response_message,
                     "table": table_name,
+                    "force_delete": force_delete,
                     "result": result
                 }), 200
             else:
