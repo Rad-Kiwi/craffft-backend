@@ -16,8 +16,8 @@ class TableManager:
         self.has_updates = False  # Track if any updates have been made
 
     # Fetch data from Airtable and store in SQLite using csv writer
-    def update_database_from_airtable(self):
-        # Note: Ideally this woul be done with a dictwriter, but I cant seem to get it to work
+    def update_database_from_airtable(self, force_delete=True):
+        # Note: Ideally this would be done with a dictwriter, but I cant seem to get it to work
 
         airtable = Airtable(self.base_id, self.table_name, self.api_key)
         records = airtable.get_all()
@@ -44,6 +44,9 @@ class TableManager:
 
         # Store in SQLite only
         if self.sqlite_storage:
+            # Delete the existing table if force_delete is True (default behavior)
+            if force_delete:
+                self.sqlite_storage.delete_table(self.table_name)
             self.sqlite_storage.import_csv_rows(self.table_name, csv_data)
 
         return f"Successfully updated DB from Airtable for table {self.table_name}."

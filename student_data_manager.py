@@ -211,7 +211,7 @@ class StudentDataManager:
             current_quest = old_current_quest if old_current_quest else ""
             
             # Use get_value_by_row_and_column to look up the quest for this step
-            step_quest_id = step_manager.get_value_by_row_and_column("name", new_current_step, "craffft_quests")
+            step_quest_id = step_manager.get_value_by_row_and_column("name", new_current_step, "craffft_quest_id")
             if not step_quest_id:
                 return {
                     "success": False,
@@ -255,7 +255,7 @@ class StudentDataManager:
                 quest_manager = self.airtable_multi_manager.get_manager("craffft_quests")
                 if quest_manager and current_quest:
                     # Get the current quest object
-                    current_quest_obj = quest_manager.get_row("quest_name", current_quest)
+                    current_quest_obj = quest_manager.get_row("short_code", current_quest)
                     if current_quest_obj:
                         # Get updated student data for progress calculation
                         updated_student = student_manager.get_row("website_id", website_id)

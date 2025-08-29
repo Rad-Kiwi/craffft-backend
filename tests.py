@@ -253,7 +253,7 @@ def test_update_step_and_check_quest():
     
     # Test parameters - use a known student
     website_id = "10"  # Using a test student ID that likely exists
-    test_step = "WW-3"  # A test step ID
+    test_step = "GG-IG-00"  # A test step ID
     
     print(f"Testing update for student website_id: {website_id} with step: {test_step}")
     
@@ -1158,4 +1158,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    test_get_step_data_api()
+    test_update_step_and_check_quest()
