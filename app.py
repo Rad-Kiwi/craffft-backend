@@ -442,6 +442,9 @@ def add_students():
             return jsonify({"error": "Missing JSON body"}), 400
 
         teacher_website_id = data.get('teacher_website_id', '')
+        # Ensure teacher_website_id is always a string
+        if isinstance(teacher_website_id, int):
+            teacher_website_id = str(teacher_website_id)
         add_classes_to_teacher = data.get('add_classes_to_teacher', False)
         students_list = data.get('students', [])
         if not students_list:
@@ -501,7 +504,6 @@ def add_students():
                     'gamer_tag': student['gamer_tag'].strip(),
                     'website_id': str(student['website_id']),  # Convert int to string for database
                     'current_class': f"{teacher_website_id}>{str(student['current_class'])}",  # Use teacher_website_id instead of name
-                    # Set default values for other fields based on your table structure
                     'current_quest': student.get('current_quest', ''),
                     'current_step': student.get('current_step', ''),
                     'quest_progress_percentage': '0' # Default to 0
