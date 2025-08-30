@@ -82,7 +82,7 @@ class StudentDataManager:
         quest_data = []
         if unique_quests:
             ids_str = "', '".join(unique_quests)
-            sql = f"SELECT * FROM craffft_quests WHERE quest_name IN ('{ids_str}')"
+            sql = f"SELECT * FROM craffft_quests WHERE short_code IN ('{ids_str}')"
             raw_quest_data = self.airtable_multi_manager.execute_sql_query('craffft_quests', sql) or []
             
             # Process quest data for frontend consumption
