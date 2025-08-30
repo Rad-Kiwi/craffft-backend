@@ -59,19 +59,31 @@ The app will be available at [http://127.0.0.1:5000/](http://127.0.0.1:5000/).
 ## Endpoints
 
 ### Health Check
-- `GET /` — Returns "Hello, Flask!" to verify the API is running
+- `GET /` — Returns API status and links to available tools
 
 ### Student Data
-- `GET /get-student-data/<student_record>` — Get individual student data by record ID
+- `GET /get-student-data-from-record/<student_record>` — Get individual student data by record ID
+- `GET /get-student-data-from-websiteId/<website_id>` — Get individual student data by website ID
 - `GET /get-student-data-dashboard/<classroom_id>` — Get dashboard data for all students in a classroom
+- `GET /update-student-current-step` — Update a student's current step (query params: websiteId, current-step)
+- `GET /update-and-check-quest` — Update student's step and check for quest changes (query params: websiteId, current-step, allow-quest-update)
+
+### Student Management
+- `POST /add-students` — Add multiple students to the database with teacher assignment
+- `POST /assign-quests` — Assign quests to multiple students
+- `POST /assign-achievement-to-student` — Assign an achievement to a student
 
 ### Teacher Data  
 - `GET /get-teacher-data/<id>` — Get teacher information by website user ID
 
+### Quest and Step Data
+- `GET /get-step-data` — Get step data (optional query param: step for specific step)
+
 ### Table Management
 - `GET /get-table-as-csv/<table_name>` — Download table data as CSV
 - `GET /get-table-as-json/<table_name>` — Get table data as JSON
-- `GET /update-server-from-airtable` — Manually trigger update from Airtable
+- `GET /update-server-from-airtable` — Manually trigger update from Airtable for all tables
+- `POST /update-table-from-airtable` — Update specific table from Airtable (supports force_delete option)
 
 ### Database Operations
 - `POST /get-value-from-db` — Query specific values from database tables
@@ -94,7 +106,8 @@ Tables are automatically created and populated from Airtable data:
 - `craffft_quests` — Educational quest definitions
 - `craffft_steps` — Individual learning steps
 - `craffft_responses` — Student responses and submissions
-- Additional curriculum and achievement tables
+- `craffft_achievements` — Student achievements and rewards
+- Additional curriculum and alignment tables
 
 ## Deployment
 
