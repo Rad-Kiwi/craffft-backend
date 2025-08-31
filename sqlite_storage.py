@@ -155,15 +155,29 @@ class SQLiteStorage:
     def execute_sql_query(self, table_name: str, sql_query: str):
         """
         Execute an arbitrary SQL query on the given table.
-        Returns a list of dicts (rows) or None if table does not exist or error.
+        Returns a list of dicts (rows) for SELECT queries, or a result summary for other operations.
         """
         try:
-            with self.engine.connect() as conn:
-                result = conn.execute(text(sql_query))
-                if result.returns_rows:
+            # Determine if this is a write operation that needs a transaction
+            query_upper = sql_query.upper().strip()
+            is_write_operation = any(query_upper.startswith(prefix) for prefix in ['INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER'])
+            
+            if is_write_operation:
+                # Use transaction context for write operations (required for PostgreSQL)
+                with self.engine.begin() as conn:
+                    result = conn.execute(text(sql_query))
+                    return [{
+                        "operation": "completed",
+                        "rows_affected": result.rowcount,
+                        "message": f"Query executed successfully. {result.rowcount} rows affected."
+                    }]
+            else:
+                # Use regular connection for read operations
+                with self.engine.connect() as conn:
+                    result = conn.execute(text(sql_query))
                     columns = result.keys()
                     return [dict(zip(columns, row)) for row in result.fetchall()]
-                return []
+                    
         except Exception as e:
             print(f"SQL query error on table {table_name}: {e}")
             return None
