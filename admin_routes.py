@@ -81,11 +81,11 @@ def execute_database_query():
         
         # Basic security: only allow SELECT, SHOW, DESCRIBE queries for safety
         query_upper = query.upper().strip()
-        allowed_prefixes = ['SELECT', 'SHOW', 'DESCRIBE', 'EXPLAIN']
+        allowed_prefixes = ['SELECT', 'SHOW', 'DESCRIBE', 'EXPLAIN', 'DELETE']
         
         if not any(query_upper.startswith(prefix) for prefix in allowed_prefixes):
-            return jsonify({"error": "Only SELECT, SHOW, DESCRIBE, and EXPLAIN queries are allowed"}), 403
-        
+            return jsonify({"error": "Only SELECT, SHOW, DESCRIBE, EXPLAIN, and DELETE queries are allowed"}), 403
+
         # Try to determine which table to query against
         # For now, we'll use the first available table as fallback
         available_tables = multi_manager.get_available_tables()
