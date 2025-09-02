@@ -57,6 +57,21 @@ class TableManager:
             return self.sqlite_storage.find_row_by_column(self.table_name, column_containing_reference, reference_value)
         return None
 
+    def get_rows(self, column_containing_reference: str, reference_value: str):
+        """
+        Get all rows that match the reference value (returns multiple rows if they exist)
+        
+        Args:
+            column_containing_reference: Column to search in
+            reference_value: Value to match
+            
+        Returns:
+            List of dictionaries representing all matching rows, or empty list if none found
+        """
+        if self.sqlite_storage:
+            return self.sqlite_storage.find_rows_by_column(self.table_name, column_containing_reference, reference_value)
+        return []
+
     def get_value_by_row_and_column(self, column_containing_reference: str, reference_value: str, target_column: str):
         if self.sqlite_storage:
             return self.sqlite_storage.find_value_by_row_and_column(self.table_name, column_containing_reference, reference_value, target_column)

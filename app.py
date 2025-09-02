@@ -585,11 +585,11 @@ def assign_quests():
         "assignments": [
             {
                 "websiteId": 12345,
-                "quest_name": "Garlic Guardians"
+                "quest_code": "GG"
             },
             {
                 "websiteId": 12346,
-                "quest_name": "Electric Orchard"
+                "quest_code": "EO"
             }
         ]
     }
@@ -607,9 +607,9 @@ def assign_quests():
         
         for assignment in assignments:
             website_id = assignment.get('websiteId')
-            quest_name = assignment.get('quest_name')
-            
-            if not website_id or not quest_name:
+            quest_code = assignment.get('quest_code')
+
+            if not website_id or not quest_code:
                 failed_assignments.append(assignment)
                 continue
             
@@ -618,13 +618,13 @@ def assign_quests():
                 column_containing_reference="website_id",
                 reference_value=str(website_id),
                 target_column="current_quest",
-                new_value=quest_name
+                new_value=quest_code
             )
             
             if success:
                 successful_assignments.append({
                     "websiteId": website_id,
-                    "quest_name": quest_name
+                    "quest_code": quest_code
                 })
             else:
                 failed_assignments.append(assignment)
@@ -642,6 +642,122 @@ def assign_quests():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/assign-quest-to-class", methods=['POST'])
+def assign_quest_to_class():
+    """
+    Assign a quest to all students in a given class.
+    
+    Expected JSON format:
+    {
+        "class_name": "15>1",
+        "quest_code": "GG"
+    }
+    
+    Or use query parameters: /assign-quest-to-class?class_name=15>1&quest_code=GG
+    """
+    try:
+        # Get parameters from JSON body or query parameters
+        class_name = None
+        quest_code = None
+        
+        if request.is_json:
+            data = request.get_json()
+            if data:
+                class_name = data.get('class_name')
+                quest_code = data.get('quest_code')
+        
+        if not class_name:
+            class_name = request.args.get('class_name')
+        if not quest_code:
+            quest_code = request.args.get('quest_code')
+        
+        if not class_name or not quest_code:
+            return jsonify({"error": "Missing required parameters: class_name and quest_code"}), 400
+        
+        # Get the students table manager
+        students_manager = multi_manager.get_manager("craffft_students")
+        
+        # Find all students in the given class using the new get_rows method
+        students_in_class = students_manager.get_rows("current_class", class_name)
+        
+        if not students_in_class:
+            return jsonify({
+                "message": f"No students found in class '{class_name}'",
+                "class_name": class_name,
+                "quest_code": quest_code,
+                "students_found": 0,
+                "successful_assignments": 0,
+                "failed_assignments": 0
+            }), 200
+        
+        successful_assignments = []
+        failed_assignments = []
+        
+        # Assign the quest to each student in the class
+        for student in students_in_class:
+            try:
+                website_id = student.get('website_id')
+                student_name = f"{student.get('first_name', '')} {student.get('last_name', '')}".strip()
+                
+                if not website_id:
+                    failed_assignments.append({
+                        "student": student_name,
+                        "error": "Missing website_id"
+                    })
+                    continue
+                
+                # Update the student's current_quest
+                success = students_manager.modify_field(
+                    column_containing_reference="website_id",
+                    reference_value=str(website_id),
+                    target_column="current_quest",
+                    new_value=quest_code
+                )
+                
+                if success:
+                    successful_assignments.append({
+                        "website_id": website_id,
+                        "student_name": student_name,
+                        "quest_code": quest_code
+                    })
+                else:
+                    failed_assignments.append({
+                        "website_id": website_id,
+                        "student_name": student_name,
+                        "error": "Failed to update quest in database"
+                    })
+                    
+            except Exception as e:
+                failed_assignments.append({
+                    "student": student.get('first_name', 'Unknown'),
+                    "error": f"Unexpected error: {str(e)}"
+                })
+        
+        # Mark table as modified for Airtable sync if any assignments were successful
+        if successful_assignments:
+            multi_manager.mark_table_as_modified("craffft_students")
+        
+        # Prepare response
+        response_data = {
+            "message": f"Processed quest assignment for class '{class_name}'",
+            "class_name": class_name,
+            "quest_code": quest_code,
+            "students_found": len(students_in_class),
+            "successful_assignments": len(successful_assignments),
+            "failed_assignments": len(failed_assignments),
+            "successful_students": successful_assignments
+        }
+        
+        if failed_assignments:
+            response_data["failed_students"] = failed_assignments
+        
+        status_code = 200 if len(successful_assignments) > 0 else 400
+        return jsonify(response_data), status_code
+        
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
 @app.route("/assign-achievement-to-student", methods=['POST'])

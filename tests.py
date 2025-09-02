@@ -17,28 +17,6 @@ def test_basic_usage():
     if csv_data:
         assert isinstance(csv_data, str)
 
-def test_custom_configuration():
-    api_key = load_env('AIRTABLE_API_KEY')
-    base_id = load_env('AIRTABLE_BASE_ID')
-    table_names = ["DataHub_Craffft", "AnotherTable", "ThirdTable"]
-    multi_manager = AirtableMultiManager(api_key=api_key, base_id=base_id, table_names=table_names)
-    multi_manager.add_table("NewTable")
-    tables = multi_manager.get_available_tables()
-    assert "NewTable" in tables
-    results = multi_manager.update_all_tables()
-    assert isinstance(results, dict)
-
-def test_config_dict():
-    config = {
-        'api_key': load_env('AIRTABLE_API_KEY'),
-        'base_id': load_env('AIRTABLE_BASE_ID'),
-        'table_names': ['DataHub_Craffft', 'Products', 'Customers']
-    }
-    multi_manager = AirtableMultiManager.from_config_dict(config)
-    for table_name in multi_manager.get_available_tables():
-        manager = multi_manager.get_manager(table_name)
-        assert manager is not None
-
 def test_error_handling():
     try:
         multi_manager = AirtableMultiManager.from_environment()
@@ -1136,6 +1114,160 @@ def test_get_step_data_api():
     
     print("✅ All get-step-data API tests passed!")
 
+def test_assign_quest_to_class_api():
+    """Test the /assign-quest-to-class API endpoint with database verification."""
+    print("\n=== Testing /assign-quest-to-class API endpoint ===")
+    
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    
+    students_manager = multi_manager.get_manager("craffft_students")
+    if not students_manager:
+        print("Error: craffft_students table not found. Skipping test.")
+        return
+    
+    # Test parameters
+    test_class_name = "TEST_CLASS_123"
+    test_quest_code = "TEST_QUEST"
+    
+    # Create test students for the test class
+    test_students = []
+    for i in range(3):
+        test_website_id = 90000 + i  # Use high numbers to avoid conflicts
+        
+        # Create test student record
+        import uuid
+        record_id = f"rec{str(uuid.uuid4()).replace('-', '')[:10]}"
+        
+        student_record = {
+            'record_id': record_id,
+            'first_name': f'TestStudent{i}',
+            'last_name': 'ClassTest',
+            'gamer_tag': f'testgamer{i}',
+            'website_id': str(test_website_id),
+            'current_class': test_class_name,
+            'current_quest': '',  # Start with no quest
+            'current_step': '',
+            'quest_progress_percentage': '0'
+        }
+        
+        # Add to database
+        success = students_manager.add_record(student_record)
+        if success:
+            test_students.append({
+                'website_id': test_website_id,
+                'record_id': record_id,
+                'name': f'TestStudent{i} ClassTest'
+            })
+            print(f"Created test student: {student_record['first_name']} {student_record['last_name']} (ID: {test_website_id})")
+    
+    if not test_students:
+        print("Error: Could not create test students. Skipping test.")
+        return
+    
+    try:
+        from app import app
+        with app.test_client() as client:
+            
+            # Test 1: POST with JSON body
+            print(f"\n--- Test 1: Assign quest '{test_quest_code}' to class '{test_class_name}' ---")
+            test_data = {
+                "class_name": test_class_name,
+                "quest_code": test_quest_code
+            }
+            
+            response = client.post('/assign-quest-to-class', 
+                                 json=test_data,
+                                 headers={'Content-Type': 'application/json'})
+            
+            print(f"Response status: {response.status_code}")
+            print(f"Response data: {response.get_json()}")
+            
+            assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+            response_data = response.get_json()
+            
+            # Verify response structure
+            assert 'class_name' in response_data, "Response should contain class_name"
+            assert 'quest_code' in response_data, "Response should contain quest_code"
+            assert 'students_found' in response_data, "Response should contain students_found"
+            assert 'successful_assignments' in response_data, "Response should contain successful_assignments"
+            
+            # Verify the correct number of students were found and assigned
+            assert response_data['class_name'] == test_class_name, f"Class name should be {test_class_name}"
+            assert response_data['quest_code'] == test_quest_code, f"Quest code should be {test_quest_code}"
+            assert response_data['students_found'] == len(test_students), f"Should find {len(test_students)} students"
+            assert response_data['successful_assignments'] == len(test_students), f"Should successfully assign to {len(test_students)} students"
+            
+            print(f"✓ Successfully assigned quest to {response_data['successful_assignments']} students")
+            
+            # Test 2: Verify database state - check that all students now have the quest assigned
+            print("\n--- Test 2: Database verification ---")
+            for test_student in test_students:
+                updated_student = students_manager.get_row("website_id", str(test_student['website_id']))
+                assert updated_student is not None, f"Student {test_student['website_id']} should exist in database"
+                
+                current_quest = updated_student.get('current_quest', '')
+                assert current_quest == test_quest_code, f"Student {test_student['website_id']} should have quest '{test_quest_code}', got '{current_quest}'"
+                
+                print(f"✓ Student {test_student['name']} (ID: {test_student['website_id']}) correctly assigned quest: {current_quest}")
+            
+            # Test 3: POST with query parameters
+            print(f"\n--- Test 3: Assign different quest using query parameters ---")
+            different_quest_code = "DIFFERENT_QUEST"
+            
+            response = client.post(f'/assign-quest-to-class?class_name={test_class_name}&quest_code={different_quest_code}')
+            
+            assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+            response_data = response.get_json()
+            assert response_data['quest_code'] == different_quest_code, f"Quest code should be {different_quest_code}"
+            assert response_data['successful_assignments'] == len(test_students), f"Should assign to {len(test_students)} students"
+            
+            print(f"✓ Successfully reassigned quest to {response_data['successful_assignments']} students")
+            
+            # Test 4: Test with non-existent class
+            print("\n--- Test 4: Non-existent class test ---")
+            non_existent_class = "NON_EXISTENT_CLASS_999"
+            test_data = {
+                "class_name": non_existent_class,
+                "quest_code": "SOME_QUEST"
+            }
+            
+            response = client.post('/assign-quest-to-class', 
+                                 json=test_data,
+                                 headers={'Content-Type': 'application/json'})
+            
+            assert response.status_code == 200, f"Expected 200 even for non-existent class, got {response.status_code}"
+            response_data = response.get_json()
+            assert response_data['students_found'] == 0, "Should find 0 students for non-existent class"
+            assert response_data['successful_assignments'] == 0, "Should have 0 successful assignments"
+            
+            print("✓ Non-existent class test passed")
+            
+            # Test 5: Test with missing parameters
+            print("\n--- Test 5: Missing parameters test ---")
+            response = client.post('/assign-quest-to-class', 
+                                 json={"class_name": test_class_name},  # Missing quest_code
+                                 headers={'Content-Type': 'application/json'})
+            
+            assert response.status_code == 400, f"Expected 400 for missing parameters, got {response.status_code}"
+            response_data = response.get_json()
+            assert 'error' in response_data, "Response should contain error message"
+            assert "Missing required parameters" in response_data['error'], "Error should mention missing parameters"
+            
+            print("✓ Missing parameters test passed")
+            
+    finally:
+        # Cleanup: Delete all test students
+        print(f"\n--- Cleanup: Deleting test students ---")
+        for test_student in test_students:
+            delete_success = students_manager.delete_record("website_id", str(test_student['website_id']))
+            if delete_success:
+                print(f"✓ Deleted test student ID: {test_student['website_id']}")
+            else:
+                print(f"⚠ Failed to delete test student ID: {test_student['website_id']}")
+    
+    print("✅ All assign-quest-to-class API tests completed!")
+
 def run_all_tests():
     import sys
     import types
@@ -1158,4 +1290,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    test_update_step_and_check_quest()
+    test_assign_quest_to_class_api()

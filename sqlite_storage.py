@@ -137,6 +137,28 @@ class SQLiteStorage:
                 columns = result.keys()
                 return dict(zip(columns, row))
             return None
+
+    def find_rows_by_column(self, table_name: str, column_containing_reference: str, reference_value: str):
+        """
+        Find all rows that match the given column value.
+        
+        Args:
+            table_name: Name of the table to search
+            column_containing_reference: Column to search in
+            reference_value: Value to match
+            
+        Returns:
+            List of dictionaries representing all matching rows
+        """
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text(f'SELECT * FROM "{table_name}" WHERE "{column_containing_reference}" = :value'), {"value": reference_value}
+            )
+            rows = result.fetchall()  # Get ALL matching rows
+            if rows:
+                columns = result.keys()
+                return [dict(zip(columns, row)) for row in rows]
+            return []
     
     def find_value_by_row_and_column(self, table_name: str, column_containing_reference: str, reference_value: str, target_column: str):
         """
