@@ -163,10 +163,31 @@ def update_table_from_airtable():
 
 @app.route("/get-table-as-json/<table_name>", methods=['GET'])
 def get_tile_data(table_name):
-    json_data = multi_manager.get_table_as_json(table_name)
-    if not json_data:
-        return Response(f"No data found for table: {table_name}", status=404)
-    return jsonify(json_data)
+    """
+    Get all data from a specified table.
+    
+    Args:
+        table_name: Name of the table to retrieve data from
+    
+    Returns:
+        All table data as JSON array with parsed stringified fields
+    """
+    try:
+        # Get the table manager
+        table_manager = multi_manager.get_manager(table_name)
+        if not table_manager:
+            return jsonify({"error": f"{table_name} table not found"}), 404
+        
+        # Get all data using the table manager's method that handles JSON parsing
+        parsed_data = table_manager.get_table_as_json_data()
+        
+        if not parsed_data:
+            return jsonify({"error": f"No data found for table: {table_name}"}), 404
+        
+        return jsonify(parsed_data), 200
+        
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
 
