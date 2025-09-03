@@ -2,6 +2,7 @@ import os
 import json
 import datetime
 import decimal
+import ast
 from dotenv import load_dotenv
 
 critical_tables = ['craffft_students', 'craffft_teachers', 'craffft_quests']
@@ -154,10 +155,9 @@ def convert_value_for_airtable(value):
         # Check if it looks like a stringified list
         if stripped.startswith('[') and stripped.endswith(']'):
             try:
-                import ast
                 parsed_value = ast.literal_eval(stripped)
                 if isinstance(parsed_value, (list, tuple)):
-                    return list(parsed_value)  # Convert tuples to lists
+                    return str(parsed_value)  # Convert tuples to str
             except (ValueError, SyntaxError):
                 pass  # If parsing fails, fall through to check for numbers
         

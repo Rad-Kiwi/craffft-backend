@@ -119,5 +119,45 @@ def test_quest_completion():
         else:
             print(f"  ❌ Cleanup failed: {cleanup_result.get('error', 'Unknown error')}")
 
+def test_upload_to_airtable():
+    """
+    Test uploading modified tables back to Airtable
+    """
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    
+    # Modify a field in a test table
+    table_name = "craffft_students"
+    column_containing_reference = "last_name"
+    reference_value = "Diaz"
+    target_column = "first_name"
+    new_value = "Updated first name for Diaz"
+    
+    manager = multi_manager.get_manager(table_name)
+    if manager:
+        # Modify the field
+        success = manager.modify_field(column_containing_reference, reference_value, target_column, new_value)
+        if success:
+            print(f"Field modified successfully. Table {table_name} marked for upload.")
+            
+            # Check that the table is marked as modified
+            modified_tables = multi_manager.get_modified_tables()
+            assert table_name in modified_tables
+            print(f"Modified tables: {modified_tables}")
+            
+            # Upload the modified table back to Airtable
+            upload_result = multi_manager.upload_table_to_airtable(table_name)
+            print(f"Upload result: {upload_result}")
+            
+            # Verify upload was successful
+            if upload_result and not upload_result.startswith("Error"):
+                print("Upload to Airtable successful!")
+                
+                # Check that the table is no longer marked as modified
+                modified_tables_after = multi_manager.get_modified_tables()
+                print(f"Modified tables after upload: {modified_tables_after}")
+            else:
+                print(f"Upload failed: {upload_result}")
+
 if __name__ == "__main__":
     test_quest_completion()

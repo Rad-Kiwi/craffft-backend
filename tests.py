@@ -70,7 +70,6 @@ def test_database_columns_example():
 
     multi_manager = AirtableMultiManager.from_environment()
     multi_manager.discover_and_add_tables_from_base()
-    table_name = "craffft_steps"
     column_containing_reference = "last_name"
     reference_value = "Diaz"
     target_column = "first_name"
@@ -159,45 +158,6 @@ def test_update_field():
         assert updated_value == new_value
         print(f"Field '{target_column}' updated successfully for '{reference_value}' in table '{table_name}'. New value: {updated_value}")
 
-def test_upload_to_airtable():
-    """
-    Test uploading modified tables back to Airtable
-    """
-    multi_manager = AirtableMultiManager.from_environment()
-    multi_manager.discover_and_add_tables_from_base()
-    
-    # Modify a field in a test table
-    table_name = "craffft_students"
-    column_containing_reference = "last_name"
-    reference_value = "Diaz"
-    target_column = "first_name"
-    new_value = "Updated first name for Diaz"
-    
-    manager = multi_manager.get_manager(table_name)
-    if manager:
-        # Modify the field
-        success = manager.modify_field(column_containing_reference, reference_value, target_column, new_value)
-        if success:
-            print(f"Field modified successfully. Table {table_name} marked for upload.")
-            
-            # Check that the table is marked as modified
-            modified_tables = multi_manager.get_modified_tables()
-            assert table_name in modified_tables
-            print(f"Modified tables: {modified_tables}")
-            
-            # Upload the modified table back to Airtable
-            upload_result = multi_manager.upload_table_to_airtable(table_name)
-            print(f"Upload result: {upload_result}")
-            
-            # Verify upload was successful
-            if upload_result and not upload_result.startswith("Error"):
-                print("Upload to Airtable successful!")
-                
-                # Check that the table is no longer marked as modified
-                modified_tables_after = multi_manager.get_modified_tables()
-                print(f"Modified tables after upload: {modified_tables_after}")
-            else:
-                print(f"Upload failed: {upload_result}")
 
 def test_get_student_by_record_id():
     """
@@ -703,7 +663,7 @@ def test_assign_quests_api():
         "assignments": [
             {
                 "websiteId": test_website_id,
-                "quest_name": "rec123testquest"
+                "quest_code": "rec123testquest"
             }
         ]
     }
@@ -736,7 +696,7 @@ def test_assign_quests_api():
         invalid_data = {
             "assignments": [
                 {
-                    "quest_name": "rec123testquest"  # Missing websiteId
+                    "quest_code": "rec123testquest"  # Missing websiteId
                 }
             ]
         }
@@ -750,11 +710,11 @@ def test_assign_quests_api():
         assert response2_data['successful_count'] == 0
         assert response2_data['failed_count'] == 1
         
-        # Test with missing quest_name
+        # Test with missing quest_code
         invalid_data2 = {
             "assignments": [
                 {
-                    "websiteId": test_website_id  # Missing quest_name
+                    "websiteId": test_website_id  # Missing quest_code
                 }
             ]
         }
@@ -1290,4 +1250,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    test_assign_quest_to_class_api()
+    run_all_tests()
