@@ -93,7 +93,7 @@ def get_table_manager(table_name):
     return Response(csv_data, mimetype='text/csv')
 
 
-@app.route("/update-server-from-airtable", methods=['GET'])
+@app.route("/update-server-from-airtable", methods=['POST'])
 def update_server_from_airtable():
     results = multi_manager.update_all_tables()
     if results:
