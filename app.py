@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, Response, render_template, send_from_directory
 from flask_cors import CORS
 import os
+import json
 from airtable_multi_manager import AirtableMultiManager
 from student_data_manager import StudentDataManager
 import threading
@@ -319,14 +320,14 @@ def get_step_data():
             parsed_step = parse_database_row(step_row)
             return jsonify(parsed_step), 200
         else:
-            # Return all steps
-            json_data = multi_manager.get_table_as_json("craffft_steps")
-            if not json_data:
+            # Return all steps using get_table_as_json_data() which returns parsed Python objects
+            steps_data = steps_manager.get_table_as_json_data()
+            if not steps_data:
                 return jsonify({"error": "No step data found"}), 404
             
             # Parse all steps to handle stringified data
             parsed_steps = []
-            for step in json_data:
+            for step in steps_data:
                 parsed_step = parse_database_row(step)
                 parsed_steps.append(parsed_step)
             

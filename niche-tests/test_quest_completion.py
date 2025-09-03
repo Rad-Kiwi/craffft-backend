@@ -119,6 +119,20 @@ def test_quest_completion():
         else:
             print(f"  ❌ Cleanup failed: {cleanup_result.get('error', 'Unknown error')}")
 
+def test_update_all_tables():
+    multi_manager = AirtableMultiManager.from_environment()
+    table_names = multi_manager.get_tables_from_base()
+    assert isinstance(table_names, list) or table_names is None
+    results = multi_manager.discover_and_add_tables_from_base()
+    assert isinstance(results, dict)
+    if table_names:
+        for table_name in table_names:
+            csv_data = multi_manager.get_csv_data(table_name)
+            if csv_data:
+                assert isinstance(csv_data, str)
+    results = multi_manager.update_all_tables()
+    assert isinstance(results, dict)
+
 def test_upload_to_airtable():
     """
     Test uploading modified tables back to Airtable

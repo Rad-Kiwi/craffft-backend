@@ -75,21 +75,6 @@ class AirtableMultiManager:
         """
         return self.managers.get(table_name)
     
-    def get_csv_data(self, table_name: str) -> Optional[str]:
-        """
-        Get CSV data for a specific table.
-        
-        Args:
-            table_name: Name of the table
-            
-        Returns:
-            CSV data as string or None if not found
-        """
-        manager = self.get_manager(table_name)
-        if manager:
-            return manager.read_csv()
-        return None
-    
     def update_database_from_airtable(self, table_name: str) -> Optional[str]:
         """
         Update CSV file from Airtable for a specific table.

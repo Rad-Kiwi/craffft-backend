@@ -9,22 +9,29 @@ import asyncio
 from app import app
 
 def test_basic_usage():
+    print("Running test_basic_usage...")
     multi_manager = AirtableMultiManager.from_environment()
     tables = multi_manager.get_available_tables()
+    if not tables:
+        print("SKIP: test_basic_usage - No tables available")
+        return "SKIPPED"
+        
     assert isinstance(tables, list)
     table_name = "craffft_students"
-    csv_data = multi_manager.get_csv_data(table_name)
-    if csv_data:
-        assert isinstance(csv_data, str)
+    json_data = multi_manager.get_table_as_json(table_name)
+    if json_data:
+        assert isinstance(json_data, str)
 
 def test_error_handling():
+    print("Running test_error_handling...")
     try:
         multi_manager = AirtableMultiManager.from_environment()
-        result = multi_manager.get_csv_data("non-existent-table")
+        result = multi_manager.get_table_as_json("non-existent-table")
         assert result is None
         removed = multi_manager.remove_table("DataHub_Craffft")
         assert isinstance(removed, bool)
-        result = multi_manager.get_csv_data("DataHub_Craffft")
+        result = multi_manager.get_table_as_json("DataHub_Craffft")
+        assert result is None
         assert result is None
     except ValueError:
         assert True
@@ -32,30 +39,22 @@ def test_error_handling():
         assert True
 
 def test_discover_tables():
+    print("Running test_discover_tables...")
     multi_manager = AirtableMultiManager.from_environment()
     table_names = multi_manager.get_tables_from_base()
     assert isinstance(table_names, list) or table_names is None
+    
+    if table_names is None or len(table_names) == 0:
+        print("SKIP: test_discover_tables - No table names found from base")
+        return "SKIPPED"
+        
     results = multi_manager.discover_and_add_tables_from_base()
     assert isinstance(results, dict)
     if table_names:
         for table_name in table_names:
-            csv_data = multi_manager.get_csv_data(table_name)
-            if csv_data:
-                assert isinstance(csv_data, str)
-
-def test_update_all_tables():
-    multi_manager = AirtableMultiManager.from_environment()
-    table_names = multi_manager.get_tables_from_base()
-    assert isinstance(table_names, list) or table_names is None
-    results = multi_manager.discover_and_add_tables_from_base()
-    assert isinstance(results, dict)
-    if table_names:
-        for table_name in table_names:
-            csv_data = multi_manager.get_csv_data(table_name)
-            if csv_data:
-                assert isinstance(csv_data, str)
-    results = multi_manager.update_all_tables()
-    assert isinstance(results, dict)
+            json_data = multi_manager.get_table_as_json(table_name)
+            if json_data:
+                assert isinstance(json_data, str)
 
 def test_database_example():
     api_key = load_env('AIRTABLE_API_KEY')
@@ -64,7 +63,12 @@ def test_database_example():
     sqlite_store = SQLiteStorage()
     manager = TableManager(base_id, table_name, api_key, sqlite_storage=sqlite_store)
     table_data = manager.get_full_table()
-    assert table_data is None or isinstance(table_data, list)
+    
+    if table_data is None:
+        print(f"SKIP: test_database_example - No data available for table {table_name}")
+        return "SKIPPED"
+    
+    assert isinstance(table_data, list)
 
 def test_database_columns_example():
 
@@ -88,8 +92,12 @@ def test_database_value_retrieval_multi_manager():
     reference_value = "Diaz"
     target_column = "first_name"
     value = multi_manager.get_value("craffft_students", column_containing_reference, reference_value, target_column)
-    if value:
-        assert isinstance(value, str)
+    
+    if value is None:
+        print(f"SKIP: test_database_value_retrieval_multi_manager - No value found for {reference_value}")
+        return "SKIPPED"
+    
+    assert isinstance(value, str)
 
 
 def test_student_data_manager():
@@ -198,8 +206,8 @@ def test_update_step_and_check_quest():
     # Get initial student state for comparison
     initial_student = student_data_manager.get_student_info(website_id)
     if not initial_student:
-        print(f"Warning: Student with website_id {website_id} not found. Skipping test.")
-        return
+        print(f"SKIP: test_update_step_and_check_quest - Student with website_id {website_id} not found")
+        return "SKIPPED"
     
     parsed_initial = parse_database_row(initial_student)
     initial_step = parsed_initial.get("current_step", "")
@@ -758,7 +766,7 @@ def test_assign_achievement_to_student_api():
     
     # Test parameters
     test_website_id = 9
-    test_achievement_name = "test badge"
+    test_achievement_name = "test badge 2"
     
     print(f"Testing achievement assignment for student websiteId: {test_website_id}, achievement: '{test_achievement_name}'")
     
@@ -767,8 +775,8 @@ def test_assign_achievement_to_student_api():
     student_record = students_manager.get_row("website_id", str(test_website_id))
     
     if not student_record:
-        print(f"Warning: Student with websiteId {test_website_id} not found. Skipping test.")
-        return
+        print(f"SKIP: test_assign_achievement_to_student_api - Student with websiteId {test_website_id} not found")
+        return "SKIPPED"
     
     print(f"Found student: {student_record.get('first_name', '')} {student_record.get('last_name', '')}")
     
@@ -777,8 +785,8 @@ def test_assign_achievement_to_student_api():
     achievement_record = achievements_manager.get_row("name", test_achievement_name)
     
     if not achievement_record:
-        print(f"Warning: Achievement '{test_achievement_name}' not found. Skipping test.")
-        return
+        print(f"SKIP: test_assign_achievement_to_student_api - Achievement '{test_achievement_name}' not found")
+        return "SKIPPED"
     
     print(f"Found achievement: {achievement_record.get('name', '')} - {achievement_record.get('description', '')}")
     
@@ -970,22 +978,38 @@ def test_get_step_data_api():
     # Verify steps table exists and has data
     steps_manager = multi_manager.get_manager("craffft_steps")
     if not steps_manager:
-        print("Warning: craffft_steps table not found. Skipping test.")
-        return
+        print("SKIP: test_get_step_data_api - craffft_steps table not found")
+        return "SKIPPED"
     
     # Get sample step data for testing
-    all_steps_data = multi_manager.get_table_as_json("craffft_steps")
-    if not all_steps_data or len(all_steps_data) == 0:
-        print("Warning: No steps data found. Skipping test.")
-        return
+    all_steps_json = steps_manager.get_table_as_json()
+
+    if not all_steps_json:
+        print("SKIP: test_get_step_data_api - No steps data found")
+        return "SKIPPED"
     
-    # Use first step for specific step testing
-    test_step = all_steps_data[0]
+    # Parse the JSON string into Python objects
+    try:
+        all_steps_data = json.loads(all_steps_json)
+    except json.JSONDecodeError:
+        print("SKIP: test_get_step_data_api - Invalid JSON data")
+        return "SKIPPED"
+    
+    if not all_steps_data or len(all_steps_data) == 0:
+        print("SKIP: test_get_step_data_api - No steps found in parsed data")
+        return "SKIPPED"
+    
+    # Use second step for specific step testing (index 1, since 0 might be headers)
+    if len(all_steps_data) < 2:
+        print("SKIP: test_get_step_data_api - Not enough steps in data")
+        return "SKIPPED"
+    
+    test_step = all_steps_data[1]
     test_step_name = test_step.get('name', '')
     
     if not test_step_name:
-        print("Warning: First step has no name field. Skipping test.")
-        return
+        print("SKIP: test_get_step_data_api - First step has no name field")
+        return "SKIPPED"
     
     print(f"Using test step: '{test_step_name}'")
     
@@ -1083,8 +1107,8 @@ def test_assign_quest_to_class_api():
     
     students_manager = multi_manager.get_manager("craffft_students")
     if not students_manager:
-        print("Error: craffft_students table not found. Skipping test.")
-        return
+        print("SKIP: test_assign_quest_to_class_api - craffft_students table not found")
+        return "SKIPPED"
     
     # Test parameters
     test_class_name = "TEST_CLASS_123"
@@ -1122,8 +1146,8 @@ def test_assign_quest_to_class_api():
             print(f"Created test student: {student_record['first_name']} {student_record['last_name']} (ID: {test_website_id})")
     
     if not test_students:
-        print("Error: Could not create test students. Skipping test.")
-        return
+        print("SKIP: test_assign_quest_to_class_api - Could not create test students")
+        return "SKIPPED"
     
     try:
         from app import app
@@ -1234,20 +1258,66 @@ def run_all_tests():
     current_module = sys.modules[__name__]
     test_functions = [getattr(current_module, name) for name in dir(current_module) if name.startswith('test_') and isinstance(getattr(current_module, name), types.FunctionType)]
     failures = 0
+    skipped = 0
+    skipped_tests = []
+    failed_tests = []
+    
+    print("=== Running All Tests ===")
+    
     for test_func in test_functions:
         try:
-            test_func()
-            print(f"PASS: {test_func.__name__}")
-        except AssertionError:
-            print(f"FAIL: {test_func.__name__}")
+            print(f"\nRunning: {test_func.__name__}")
+            result = test_func()
+            if result == "SKIPPED":
+                print(f"SKIP: {test_func.__name__} - Test was skipped due to missing data or conditions")
+                skipped += 1
+                skipped_tests.append(test_func.__name__)
+            else:
+                print(f"PASS: {test_func.__name__}")
+        except AssertionError as e:
+            print(f"FAIL: {test_func.__name__} - Assertion failed: {e}")
             failures += 1
+            failed_tests.append({'name': test_func.__name__, 'error': str(e), 'type': 'AssertionError'})
         except Exception as e:
-            print(f"ERROR: {test_func.__name__} - {e}")
+            print(f"ERROR: {test_func.__name__} - Unexpected error: {e}")
             failures += 1
+            failed_tests.append({'name': test_func.__name__, 'error': str(e), 'type': type(e).__name__})
+    
+    # Summary
+    total_tests = len(test_functions)
+    passed = total_tests - failures - skipped
+    print(f"\n=== Test Summary ===")
+    print(f"Total tests: {total_tests}")
+    print(f"Passed: {passed}")
+    print(f"Failed: {failures}")
+    print(f"Skipped: {skipped}")
+    
+    if skipped_tests:
+        print(f"\nSkipped tests:")
+        for skipped_test in skipped_tests:
+            print(f"  - {skipped_test}")
+    
+    if failed_tests:
+        print(f"\nFailed tests:")
+        for failed_test in failed_tests:
+            print(f"  - {failed_test['name']} ({failed_test['type']}): {failed_test['error']}")
+    
     if failures == 0:
-        print("All tests passed.")
+        if skipped == 0:
+            print("\n✅ All tests passed!")
+        else:
+            print(f"\n✅ All non-skipped tests passed! ({skipped} tests were skipped)")
     else:
-        print(f"{failures} test(s) failed.")
+        print(f"\n❌ {failures} test(s) failed.")
+    
+    return {
+        'total': total_tests,
+        'passed': passed,
+        'failed': failures,
+        'skipped': skipped,
+        'skipped_tests': skipped_tests,
+        'failed_tests': failed_tests
+    }
 
 if __name__ == "__main__":
     run_all_tests()
