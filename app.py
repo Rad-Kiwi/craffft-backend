@@ -729,29 +729,8 @@ def assign_quest_to_class():
                     })
                     continue
                 
-                # Update the student's current_quest, reset progress and step
-                quest_success = students_manager.modify_field(
-                    column_containing_reference="website_id",
-                    reference_value=str(website_id),
-                    target_column="current_quest",
-                    new_value=quest_code
-                )
-                
-                progress_success = students_manager.modify_field(
-                    column_containing_reference="website_id",
-                    reference_value=str(website_id),
-                    target_column="quest_progress_percentage",
-                    new_value="0"
-                )
-                
-                step_success = students_manager.modify_field(
-                    column_containing_reference="website_id",
-                    reference_value=str(website_id),
-                    target_column="current_step",
-                    new_value=""
-                )
-                
-                success = quest_success and progress_success and step_success
+                # Reset quest fields and assign new quest using StudentDataManager
+                success = student_data_manager.reset_student_quest(str(website_id), quest_code)
                 
                 if success:
                     successful_assignments.append({
