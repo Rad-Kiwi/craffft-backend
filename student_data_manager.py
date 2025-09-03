@@ -67,6 +67,14 @@ class StudentDataManager:
             print(f'Error calculating progress: {e}')
             return "0"
 
+    def get_student_by_class(self, classroom_id):
+        """
+        Retrieve all students in a specific classroom.
+        Returns a list of student data dicts or an empty list if none found.
+        """
+        sql = f"SELECT * FROM craffft_students WHERE current_class = '{classroom_id}'"
+        return self.airtable_multi_manager.execute_sql_query('craffft_students', sql)
+
     def get_students_data_for_dashboard(self, classroom_id):
         # Retrieve the students for the classroom
         students = self.get_student_by_class(classroom_id)

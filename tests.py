@@ -63,8 +63,8 @@ def test_database_example():
     table_name = "craffft_students"
     sqlite_store = SQLiteStorage()
     manager = TableManager(base_id, table_name, api_key, sqlite_storage=sqlite_store)
-    csv_data = manager.read_csv(from_db=True)
-    assert csv_data is None or isinstance(csv_data, str)
+    table_data = manager.get_full_table()
+    assert table_data is None or isinstance(table_data, list)
 
 def test_database_columns_example():
 
