@@ -314,8 +314,18 @@ class SQLiteStorage:
                 quoted_fieldnames = ', '.join([f'"{col}"' for col in fieldnames])
                 insert_sql = text(f'INSERT INTO "{table_name}" ({quoted_fieldnames}) VALUES ({placeholders})')
                 
-                # Ensure all keys exist (fill missing with empty string)
-                row_dict = {col: record_data.get(col, '') for col in fieldnames}
+                # Ensure all keys exist and convert complex data types to JSON strings
+                row_dict = {}
+                for col in fieldnames:
+                    value = record_data.get(col, '')
+                    # Convert complex data types to JSON strings
+                    if isinstance(value, (list, dict)):
+                        import json
+                        row_dict[col] = json.dumps(value)
+                        print(f"JSON-serialized {type(value).__name__} for database storage in column '{col}': {row_dict[col]}")
+                    else:
+                        row_dict[col] = value
+                        
                 result = conn.execute(insert_sql, row_dict)
                 
                 return result.rowcount > 0
