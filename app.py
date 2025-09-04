@@ -8,6 +8,7 @@ from scheduler import DailyAirtableUploader
 from utilities import load_env, deep_jsonify, parse_database_row, critical_tables
 from quest_routes import quest_bp
 from admin_routes import admin_bp
+import uuid
 
 app = Flask(__name__)
 CORS(app)
@@ -505,7 +506,6 @@ def add_students():
                     })
                     continue
                     
-                if not isinstance(student['current_class'], int):
                     failed_students.append({
                         "index": i,
                         "student": student,
@@ -514,7 +514,6 @@ def add_students():
                     continue
                 
                 # Generate record ID
-                import uuid
                 record_id = f"rec{str(uuid.uuid4()).replace('-', '')[:10]}"
                 
                 # Create student record based on your table structure
