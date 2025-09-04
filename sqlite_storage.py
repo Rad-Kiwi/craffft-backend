@@ -137,6 +137,28 @@ class SQLiteStorage:
                 columns = result.keys()
                 return dict(zip(columns, row))
             return None
+
+    def find_rows_by_column(self, table_name: str, column_containing_reference: str, reference_value: str):
+        """
+        Find all rows that match the given column value.
+        
+        Args:
+            table_name: Name of the table to search
+            column_containing_reference: Column to search in
+            reference_value: Value to match
+            
+        Returns:
+            List of dictionaries representing all matching rows
+        """
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text(f'SELECT * FROM "{table_name}" WHERE "{column_containing_reference}" = :value'), {"value": reference_value}
+            )
+            rows = result.fetchall()  # Get ALL matching rows
+            if rows:
+                columns = result.keys()
+                return [dict(zip(columns, row)) for row in rows]
+            return []
     
     def find_value_by_row_and_column(self, table_name: str, column_containing_reference: str, reference_value: str, target_column: str):
         """
@@ -155,15 +177,29 @@ class SQLiteStorage:
     def execute_sql_query(self, table_name: str, sql_query: str):
         """
         Execute an arbitrary SQL query on the given table.
-        Returns a list of dicts (rows) or None if table does not exist or error.
+        Returns a list of dicts (rows) for SELECT queries, or a result summary for other operations.
         """
         try:
-            with self.engine.connect() as conn:
-                result = conn.execute(text(sql_query))
-                if result.returns_rows:
+            # Determine if this is a write operation that needs a transaction
+            query_upper = sql_query.upper().strip()
+            is_write_operation = any(query_upper.startswith(prefix) for prefix in ['INSERT', 'UPDATE', 'DELETE', 'CREATE', 'DROP', 'ALTER'])
+            
+            if is_write_operation:
+                # Use transaction context for write operations (required for PostgreSQL)
+                with self.engine.begin() as conn:
+                    result = conn.execute(text(sql_query))
+                    return [{
+                        "operation": "completed",
+                        "rows_affected": result.rowcount,
+                        "message": f"Query executed successfully. {result.rowcount} rows affected."
+                    }]
+            else:
+                # Use regular connection for read operations
+                with self.engine.connect() as conn:
+                    result = conn.execute(text(sql_query))
                     columns = result.keys()
                     return [dict(zip(columns, row)) for row in result.fetchall()]
-                return []
+                    
         except Exception as e:
             print(f"SQL query error on table {table_name}: {e}")
             return None
@@ -278,8 +314,18 @@ class SQLiteStorage:
                 quoted_fieldnames = ', '.join([f'"{col}"' for col in fieldnames])
                 insert_sql = text(f'INSERT INTO "{table_name}" ({quoted_fieldnames}) VALUES ({placeholders})')
                 
-                # Ensure all keys exist (fill missing with empty string)
-                row_dict = {col: record_data.get(col, '') for col in fieldnames}
+                # Ensure all keys exist and convert complex data types to JSON strings
+                row_dict = {}
+                for col in fieldnames:
+                    value = record_data.get(col, '')
+                    # Convert complex data types to JSON strings
+                    if isinstance(value, (list, dict)):
+                        import json
+                        row_dict[col] = json.dumps(value)
+                        print(f"JSON-serialized {type(value).__name__} for database storage in column '{col}': {row_dict[col]}")
+                    else:
+                        row_dict[col] = value
+                        
                 result = conn.execute(insert_sql, row_dict)
                 
                 return result.rowcount > 0
