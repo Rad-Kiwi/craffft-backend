@@ -9,13 +9,8 @@ import asyncio
 from app import app
 
 def test_basic_usage():
-    print("Running test_basic_usage...")
     multi_manager = AirtableMultiManager.from_environment()
     tables = multi_manager.get_available_tables()
-    if not tables:
-        print("SKIP: test_basic_usage - No tables available")
-        return "SKIPPED"
-        
     assert isinstance(tables, list)
     table_name = "craffft_students"
     json_data = multi_manager.get_table_as_json(table_name)
@@ -23,7 +18,6 @@ def test_basic_usage():
         assert isinstance(json_data, str)
 
 def test_error_handling():
-    print("Running test_error_handling...")
     try:
         multi_manager = AirtableMultiManager.from_environment()
         result = multi_manager.get_table_as_json("non-existent-table")
@@ -39,15 +33,9 @@ def test_error_handling():
         assert True
 
 def test_discover_tables():
-    print("Running test_discover_tables...")
     multi_manager = AirtableMultiManager.from_environment()
     table_names = multi_manager.get_tables_from_base()
     assert isinstance(table_names, list) or table_names is None
-    
-    if table_names is None or len(table_names) == 0:
-        print("SKIP: test_discover_tables - No table names found from base")
-        return "SKIPPED"
-        
     results = multi_manager.discover_and_add_tables_from_base()
     assert isinstance(results, dict)
     if table_names:
@@ -982,28 +970,13 @@ def test_get_step_data_api():
         return "SKIPPED"
     
     # Get sample step data for testing
-    all_steps_json = steps_manager.get_table_as_json()
+    all_steps_data = steps_manager.get_table_as_json()
 
-    if not all_steps_json:
+    if not all_steps_data or len(all_steps_data) == 0:
         print("SKIP: test_get_step_data_api - No steps data found")
         return "SKIPPED"
     
-    # Parse the JSON string into Python objects
-    try:
-        all_steps_data = json.loads(all_steps_json)
-    except json.JSONDecodeError:
-        print("SKIP: test_get_step_data_api - Invalid JSON data")
-        return "SKIPPED"
-    
-    if not all_steps_data or len(all_steps_data) == 0:
-        print("SKIP: test_get_step_data_api - No steps found in parsed data")
-        return "SKIPPED"
-    
-    # Use second step for specific step testing (index 1, since 0 might be headers)
-    if len(all_steps_data) < 2:
-        print("SKIP: test_get_step_data_api - Not enough steps in data")
-        return "SKIPPED"
-    
+    # Use first step for specific step testing
     test_step = all_steps_data[1]
     test_step_name = test_step.get('name', '')
     
@@ -1259,29 +1232,21 @@ def run_all_tests():
     test_functions = [getattr(current_module, name) for name in dir(current_module) if name.startswith('test_') and isinstance(getattr(current_module, name), types.FunctionType)]
     failures = 0
     skipped = 0
-    skipped_tests = []
-    failed_tests = []
-    
-    print("=== Running All Tests ===")
     
     for test_func in test_functions:
         try:
-            print(f"\nRunning: {test_func.__name__}")
             result = test_func()
             if result == "SKIPPED":
-                print(f"SKIP: {test_func.__name__} - Test was skipped due to missing data or conditions")
+                print(f"SKIP: {test_func.__name__}")
                 skipped += 1
-                skipped_tests.append(test_func.__name__)
             else:
                 print(f"PASS: {test_func.__name__}")
-        except AssertionError as e:
-            print(f"FAIL: {test_func.__name__} - Assertion failed: {e}")
+        except AssertionError:
+            print(f"FAIL: {test_func.__name__}")
             failures += 1
-            failed_tests.append({'name': test_func.__name__, 'error': str(e), 'type': 'AssertionError'})
         except Exception as e:
-            print(f"ERROR: {test_func.__name__} - Unexpected error: {e}")
+            print(f"ERROR: {test_func.__name__} - {e}")
             failures += 1
-            failed_tests.append({'name': test_func.__name__, 'error': str(e), 'type': type(e).__name__})
     
     # Summary
     total_tests = len(test_functions)
@@ -1292,32 +1257,10 @@ def run_all_tests():
     print(f"Failed: {failures}")
     print(f"Skipped: {skipped}")
     
-    if skipped_tests:
-        print(f"\nSkipped tests:")
-        for skipped_test in skipped_tests:
-            print(f"  - {skipped_test}")
-    
-    if failed_tests:
-        print(f"\nFailed tests:")
-        for failed_test in failed_tests:
-            print(f"  - {failed_test['name']} ({failed_test['type']}): {failed_test['error']}")
-    
     if failures == 0:
-        if skipped == 0:
-            print("\n✅ All tests passed!")
-        else:
-            print(f"\n✅ All non-skipped tests passed! ({skipped} tests were skipped)")
+        print("All non-skipped tests passed!")
     else:
-        print(f"\n❌ {failures} test(s) failed.")
-    
-    return {
-        'total': total_tests,
-        'passed': passed,
-        'failed': failures,
-        'skipped': skipped,
-        'skipped_tests': skipped_tests,
-        'failed_tests': failed_tests
-    }
+        print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
     run_all_tests()
