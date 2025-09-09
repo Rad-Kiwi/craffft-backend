@@ -70,7 +70,10 @@ The app will be available at [http://127.0.0.1:5000/](http://127.0.0.1:5000/).
 
 ### Student Management
 - `POST /add-students` — Add multiple students to the database with teacher assignment
+- `DELETE /delete-students` — Delete multiple students by their website IDs
+- `PUT /modify-students` — Modify student names (first_name, last_name) by website IDs
 - `POST /assign-quests` — Assign quests to multiple students
+- `POST /assign-quest-to-class` — Assign a quest to all students in a specific class
 - `POST /assign-achievement-to-student` — Assign an achievement to a student
 
 ### Teacher Data  
