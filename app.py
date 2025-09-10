@@ -289,6 +289,73 @@ def get_teacher_data(id):
     return jsonify(teacher_info)
 
 
+@app.route("/add-teacher", methods=['POST'])
+def add_teacher():
+    """
+    Add a teacher to the craffft_teachers table.
+    
+    Expected JSON format:
+    {
+        "website_user_id": "12345",
+        "first_name": "John",
+        "last_name": "Smith",
+        "school_name": "Example School"  // optional
+    }
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing JSON body"}), 400
+
+    # Validate required fields
+    required_fields = ['website_user_id', 'first_name', 'last_name']
+    missing_fields = [field for field in required_fields if not data.get(field)]
+    
+    if missing_fields:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
+    
+    # Get the teachers table manager
+    teachers_manager = multi_manager.get_manager("craffft_teachers")
+    
+    # Check if teacher already exists
+    existing_teacher = teachers_manager.get_row("website_user_id", str(data['website_user_id']))
+    if existing_teacher:
+        return jsonify({
+            "error": f"Teacher with website_user_id {data['website_user_id']} already exists"
+        }), 409  # Conflict
+    
+    # Generate record ID
+    record_id = f"rec{str(uuid.uuid4()).replace('-', '')[:10]}"
+    
+    # Create teacher record
+    teacher_record = {
+        'record_id': record_id,
+        'website_user_id': str(data['website_user_id']),
+        'first_name': data['first_name'].strip(),
+        'last_name': data['last_name'].strip(),
+        'school_name': data.get('school_name', '').strip() if data.get('school_name') else ''
+    }
+    
+    # Add the teacher to the database
+    success = teachers_manager.add_record(teacher_record)
+    
+    if success:
+        # Mark table as modified for Airtable sync
+        multi_manager.mark_table_as_modified("craffft_teachers")
+        
+        return jsonify({
+            "message": "Teacher added successfully",
+            "teacher": {
+                "record_id": record_id,
+                "website_user_id": data['website_user_id'],
+                "first_name": data['first_name'],
+                "last_name": data['last_name'],
+                "school_name": teacher_record['school_name']
+            }
+        }), 201
+    else:
+        return jsonify({"error": "Failed to add teacher to database"}), 500
+
+
 @app.route("/get-step-data", methods=['GET'])
 def get_step_data():
     """
