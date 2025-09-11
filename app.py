@@ -517,7 +517,7 @@ def add_students():
             {
                 "first_name": "John",
                 "last_name": "Doe",
-                "gamer_tag": "johndoe123", 
+                "gamer_tag": "johndoe123",  // optional
                 "website_id": 12345,
                 "current_class": 1
             },
@@ -552,8 +552,8 @@ def add_students():
         
         for i, student in enumerate(students_list):
             try:
-                # Validate required fields
-                required_fields = ['first_name', 'last_name', 'gamer_tag', 'website_id', 'current_class']
+                # Validate required fields (gamer_tag is now optional)
+                required_fields = ['first_name', 'last_name', 'website_id', 'current_class']
                 missing_fields = [field for field in required_fields if field not in student or student.get(field) is None]
                 
                 if missing_fields:
@@ -588,7 +588,7 @@ def add_students():
                     'record_id': record_id,
                     'first_name': student['first_name'].strip(),
                     'last_name': student['last_name'].strip(),
-                    'gamer_tag': student['gamer_tag'].strip(),
+                    'gamer_tag': student.get('gamer_tag', '').strip() if student.get('gamer_tag') else '',
                     'website_id': str(student['website_id']),  # Convert int to string for database
                     'current_class': f"{teacher_website_id}>{str(student['current_class'])}",  # Use teacher_website_id instead of name
                     'current_quest': student.get('current_quest', ''),
@@ -604,7 +604,7 @@ def add_students():
                         "record_id": record_id,
                         "first_name": student['first_name'],
                         "last_name": student['last_name'],
-                        "gamer_tag": student['gamer_tag'],
+                        "gamer_tag": student.get('gamer_tag', ''),
                         "website_id": student['website_id']  # Keep as integer in response
                     })
                 else:
