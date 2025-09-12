@@ -93,7 +93,8 @@ def setup_api_docs(app):
         All endpoints are relative to the base URL of this server.
         """,
         doc='/docs/',
-        prefix=''  # No prefix to match existing routes
+        validate=False,  # Disable validation that might interfere
+        catch_all_404s=False  # Don't let Flask-RESTX catch all 404s
     )
     
     # Define namespaces for organizing endpoints

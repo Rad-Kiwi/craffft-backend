@@ -62,10 +62,6 @@ app.register_blueprint(quest_bp)
 # Register admin routes blueprint
 app.register_blueprint(admin_bp)
 
-# Set up API documentation
-from docs.swagger_docs import setup_api_docs
-api = setup_api_docs(app)
-
 
 def deep_jsonify_response(obj):
     """
@@ -1204,6 +1200,11 @@ def get_modified_tables():
         "modified_tables": modified_tables,
         "count": len(modified_tables)
     })
+
+
+# Set up API documentation after all routes are defined
+from docs.swagger_docs import setup_api_docs
+api = setup_api_docs(app)
 
 
 # --- Scheduler Initialisation ---
