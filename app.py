@@ -62,6 +62,10 @@ app.register_blueprint(quest_bp)
 # Register admin routes blueprint
 app.register_blueprint(admin_bp)
 
+# Set up API documentation
+from docs.swagger_docs import setup_api_docs
+api = setup_api_docs(app)
+
 
 def deep_jsonify_response(obj):
     """
@@ -78,6 +82,10 @@ def home():
     return """
     <h1>Craffft Backend - Up and running!</h1>
     <p><a href="https://github.com/radkiwi/craffft-backend">View all routes on GitHub</a></p>
+    <h2>API Documentation:</h2>
+    <ul>
+        <li><a href="/docs/">📚 Interactive API Documentation (Swagger)</a> - Test all endpoints with live examples</li>
+    </ul>
     <h2>Tools:</h2>
     <ul>
         <li><a href="/quest-generator">🎮 Quest Generator</a> - Create new quests and steps</li>
