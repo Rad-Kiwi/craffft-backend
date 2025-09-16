@@ -5,6 +5,10 @@ This is the backend API for the CRAFFFT educational platform, providing data man
 Currently deployed here:
 https://craffft-api-e21e23f89690.herokuapp.com/
 
+Documentaion available here:
+https://craffft-api-e21e23f89690.herokuapp.com/docs/
+
+
 The backend manages multiple Airtable tables containing student data, teacher information, quests, steps, and curriculum data. It provides RESTful API endpoints for the frontend application and handles data synchronization between Airtable and a local/cloud database.
 
 ## Features
@@ -186,3 +190,121 @@ The scheduler runs automatically and updates data from Airtable:
 - **Development**: On-demand via API endpoints
 
 This ensures the local database stays synchronized with the latest Airtable data.
+
+## API Documentation Development
+
+### Building and Maintaining the Documentation
+
+The API documentation is built using Flask-RESTX (Swagger/OpenAPI) and is automatically generated from the code. Here's how to work with it:
+
+### Documentation Structure
+
+```
+docs/
+├── swagger_docs.py          # Main documentation setup and endpoint definitions
+└── app_docs_integration.py  # Integration helpers (if needed)
+```
+
+### Setting Up Documentation for New Endpoints
+
+1. **Add the endpoint to your Flask app** (`app.py`):
+   ```python
+   @app.route("/your-new-endpoint", methods=['POST'])
+   def your_new_function():
+       # Your endpoint logic
+       return jsonify({"message": "success"})
+   ```
+
+2. **Add documentation in `docs/swagger_docs.py`**:
+   ```python
+   @your_namespace.route('/your-new-endpoint')
+   class YourNewEndpointDoc(Resource):
+       @your_namespace.expect(your_model, validate=True)
+       @your_namespace.doc('your_endpoint_description')
+       @your_namespace.response(200, 'Success', success_response_model)
+       @your_namespace.response(400, 'Invalid input', error_response_model)
+       def post(self):
+           """Brief description of what this endpoint does"""
+           return call_view_function('your_new_function')
+   ```
+
+### Creating Data Models
+
+Define request/response schemas for validation and documentation:
+
+```python
+your_model = api.model('YourModel', {
+    'field_name': fields.String(required=True, description='Field description', example='example_value'),
+    'optional_field': fields.Integer(required=False, description='Optional field', example=123)
+})
+```
+
+### Documentation Development Workflow
+
+1. **Start the development server**:
+   ```bash
+   python app.py
+   ```
+
+2. **View documentation at**: `http://localhost:5000/docs/`
+
+3. **Make changes to documentation**:
+   - Edit `docs/swagger_docs.py`
+   - Restart the server to see changes
+   - Test endpoints using the "Try it out" feature
+
+4. **Validate your documentation**:
+   - Ensure all endpoints are properly documented
+   - Test request/response schemas
+   - Verify examples work correctly
+
+### Key Components to Maintain
+
+1. **Namespaces**: Organize endpoints by functionality
+   ```python
+   students_ns = Namespace('Students', description='Student management operations')
+   ```
+
+2. **Models**: Keep request/response schemas up to date
+   ```python
+   student_model = api.model('Student', {
+       'first_name': fields.String(required=True, description='Student first name'),
+       # ... other fields
+   })
+   ```
+
+3. **Helper Function**: Ensures Flask routes work with Flask-RESTX
+   ```python
+   def call_view_function(func_name, *args, **kwargs):
+       # Handles Response object conversion for Flask-RESTX compatibility
+   ```
+
+### Best Practices for Documentation
+
+1. **Always include**:
+   - Clear descriptions for endpoints and parameters
+   - Example values for all fields
+   - All possible response codes
+   - Error response documentation
+
+2. **Test thoroughly**:
+   - Use the interactive "Try it out" feature
+   - Verify request/response schemas match actual behavior
+   - Test error scenarios
+
+3. **Keep synchronized**:
+   - Update documentation when changing endpoint behavior
+   - Add new endpoints to the appropriate namespace
+   - Update models when changing data structures
+
+### Troubleshooting Documentation Issues
+
+- **Route conflicts**: Ensure Flask routes are defined before documentation setup
+- **Model validation errors**: Check field types and requirements match actual data
+- **Response serialization issues**: The `call_view_function` helper handles Flask Response objects
+
+### Accessing the Documentation
+
+- **Local Development**: `http://localhost:5000/docs/`
+- **Production**: `https://craffft-api-e21e23f89690.herokuapp.com/docs/`
+- **From Home Page**: Click "Interactive API Documentation" link at `http://localhost:5000/`
