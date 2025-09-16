@@ -70,7 +70,10 @@ The app will be available at [http://127.0.0.1:5000/](http://127.0.0.1:5000/).
 
 ### Student Management
 - `POST /add-students` — Add multiple students to the database with teacher assignment
+- `DELETE /delete-students` — Delete multiple students by their website IDs
+- `PUT /modify-students` — Modify student names (first_name, last_name) by website IDs
 - `POST /assign-quests` — Assign quests to multiple students
+- `POST /assign-quest-to-class` — Assign a quest to all students in a specific class
 - `POST /assign-achievement-to-student` — Assign an achievement to a student
 
 ### Teacher Data  
@@ -115,6 +118,42 @@ Tables are automatically created and populated from Airtable data:
 ```bash
 python app.py
 ```
+
+## Running Tests
+
+The project includes comprehensive tests for all API endpoints and functionality.
+
+### Run All Tests
+```bash
+python tests.py
+```
+
+### Run Specific Tests
+You can run individual test functions by importing and calling them:
+
+```python
+from tests import test_delete_students_api, test_modify_students_api
+test_delete_students_api()
+test_modify_students_api()
+```
+
+### Test Coverage
+The test suite includes:
+- **Database Operations**: Table management, CRUD operations, data validation
+- **Student Management**: Add, delete, modify students with database verification
+- **Quest Assignment**: Individual and class-wide quest assignments
+- **Achievement System**: Student achievement assignment and tracking
+- **API Endpoints**: All REST endpoints with success and error scenarios
+- **Data Synchronization**: Airtable integration and upload functionality
+
+### Test Environment
+Tests automatically:
+- Set up test data in the database
+- Verify API responses and status codes
+- Confirm database changes are persisted
+- Clean up test data after completion
+
+**Note**: Tests use the same database configuration as the main application, so ensure your environment variables are properly configured before running tests, and ensure you have a copy of the database locally
 
 ### Heroku Deployment
 The app is configured for Heroku deployment with:

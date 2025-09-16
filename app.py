@@ -595,6 +595,165 @@ def add_students():
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
+@app.route("/delete-students", methods=['DELETE'])
+def delete_students():
+    """
+    Delete multiple students by their website IDs.
+    
+    Expected JSON format:
+    {
+        "website_ids": [12345, 12346, 12347]
+    }
+    """
+    data = request.get_json()
+    if not data or not data.get('website_ids'):
+        return jsonify({"error": "Missing 'website_ids' array"}), 400
+    
+    website_ids = data['website_ids']
+    students_manager = multi_manager.get_manager("craffft_students")
+    
+    deleted = []
+    failed = []
+    
+    for website_id in website_ids:
+        website_id_str = str(website_id)
+        
+        # Get student info before deletion
+        student = students_manager.get_row("website_id", website_id_str)
+        if not student:
+            failed.append({"website_id": website_id, "error": "Student not found"})
+            continue
+        
+        # Delete the student
+        if students_manager.delete_record("website_id", website_id_str):
+            deleted.append({
+                "website_id": website_id,
+                "name": f"{student.get('first_name', '')} {student.get('last_name', '')}".strip()
+            })
+        else:
+            failed.append({"website_id": website_id, "error": "Delete failed"})
+    
+    # Mark table for Airtable sync
+    if deleted:
+        multi_manager.mark_table_as_modified("craffft_students")
+    
+    # Determine appropriate status code
+    if not deleted and not failed:
+        # No website_ids provided or empty array
+        status_code = 400
+    elif deleted and not failed:
+        # All deletions successful
+        status_code = 200
+    elif not deleted and failed:
+        # All deletions failed (students not found or delete errors)
+        status_code = 404 if all("not found" in f.get("error", "").lower() for f in failed) else 422
+    else:
+        # Mixed results (some succeeded, some failed)
+        status_code = 207  # Multi-Status
+    
+    return jsonify({
+        "deleted": len(deleted),
+        "failed": len(failed),
+        "deleted_students": deleted,
+        "failed_deletions": failed if failed else None
+    }), status_code
+
+
+@app.route("/modify-students", methods=['PUT'])
+def modify_students():
+    """
+    Modify student names by their website IDs.
+    
+    Expected JSON format:
+    {
+        "students": [
+            {
+                "website_id": 12345,
+                "first_name": "NewFirstName",
+                "last_name": "NewLastName"
+            },
+            {
+                "website_id": 12346,
+                "first_name": "AnotherFirst"
+                // last_name is optional - only provided fields will be updated
+            }
+        ]
+    }
+    """
+    data = request.get_json()
+    if not data or not data.get('students'):
+        return jsonify({"error": "Missing 'students' array"}), 400
+    
+    students_list = data['students']
+    students_manager = multi_manager.get_manager("craffft_students")
+    
+    modified = []
+    failed = []
+    
+    for student_update in students_list:
+        website_id = student_update.get('website_id')
+        if not website_id:
+            failed.append({"student": student_update, "error": "Missing website_id"})
+            continue
+            
+        website_id_str = str(website_id)
+        
+        # Check if student exists
+        student = students_manager.get_row("website_id", website_id_str)
+        if not student:
+            failed.append({"website_id": website_id, "error": "Student not found"})
+            continue
+        
+        # Update first_name if provided
+        updates_made = []
+        if 'first_name' in student_update:
+            if students_manager.modify_field("website_id", website_id_str, "first_name", student_update['first_name']):
+                updates_made.append("first_name")
+            else:
+                failed.append({"website_id": website_id, "error": "Failed to update first_name"})
+                continue
+        
+        # Update last_name if provided
+        if 'last_name' in student_update:
+            if students_manager.modify_field("website_id", website_id_str, "last_name", student_update['last_name']):
+                updates_made.append("last_name")
+            else:
+                failed.append({"website_id": website_id, "error": "Failed to update last_name"})
+                continue
+        
+        if updates_made:
+            modified.append({
+                "website_id": website_id,
+                "updated_fields": updates_made,
+                "new_name": f"{student_update.get('first_name', student.get('first_name', ''))} {student_update.get('last_name', student.get('last_name', ''))}".strip()
+            })
+    
+    # Mark table for Airtable sync
+    if modified:
+        multi_manager.mark_table_as_modified("craffft_students")
+    
+    # Determine appropriate status code
+    if not modified and not failed:
+        # No valid updates requested
+        status_code = 400
+    elif modified and not failed:
+        # All modifications successful
+        status_code = 200
+    elif not modified and failed:
+        # All modifications failed
+        status_code = 404 if all("not found" in f.get("error", "").lower() for f in failed) else 422
+    else:
+        # Mixed results (some succeeded, some failed)
+        status_code = 207  # Multi-Status
+    
+    return jsonify({
+        "modified": len(modified),
+        "failed": len(failed),
+        "modified_students": modified,
+        "failed_modifications": failed if failed else None
+    }), status_code
+
+
 @app.route("/assign-quests", methods=['POST'])
 def assign_quests():
     """

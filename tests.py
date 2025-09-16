@@ -1225,6 +1225,238 @@ def test_assign_quest_to_class_api():
     
     print("✅ All assign-quest-to-class API tests completed!")
 
+def test_delete_students_api():
+    """Test the /delete-students API endpoint."""
+    print("\n=== Testing /delete-students API endpoint ===")
+    
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    students_manager = multi_manager.get_manager("craffft_students")
+    
+    # First, add some test students to delete
+    test_students = [
+        {
+            "record_id": "rectestdel001",
+            "first_name": "DeleteTest",
+            "last_name": "Student1",
+            "gamer_tag": "@deleteme1",
+            "website_id": "9991",
+            "current_class": "test>1",
+            "current_quest": "",
+            "current_step": "",
+            "quest_progress_percentage": "0"
+        },
+        {
+            "record_id": "rectestdel002", 
+            "first_name": "DeleteTest",
+            "last_name": "Student2",
+            "gamer_tag": "@deleteme2",
+            "website_id": "9992",
+            "current_class": "test>1",
+            "current_quest": "",
+            "current_step": "",
+            "quest_progress_percentage": "0"
+        }
+    ]
+    
+    # Add test students
+    for student in test_students:
+        success = students_manager.add_record(student)
+        assert success, f"Failed to add test student {student['website_id']}"
+        print(f"✓ Added test student: {student['first_name']} {student['last_name']} (ID: {student['website_id']})")
+    
+    try:
+        # Test successful deletion
+        print("\n--- Test: Successful deletion ---")
+        delete_data = {
+            "website_ids": [9991, 9992]
+        }
+        
+        with app.test_client() as client:
+            response = client.delete('/delete-students',
+                                   data=json.dumps(delete_data),
+                                   content_type='application/json')
+            
+            print(f"Delete response status: {response.status_code}")
+            response_data = response.get_json()
+            print(f"Response data: {response_data}")
+            
+            assert response.status_code == 200
+            assert response_data['deleted'] == 2
+            assert response_data['failed'] == 0
+            assert len(response_data['deleted_students']) == 2
+        
+        # Verify students were actually deleted from database
+        for student in test_students:
+            deleted_student = students_manager.get_row("website_id", student['website_id'])
+            assert deleted_student is None, f"Student {student['website_id']} should have been deleted"
+            print(f"✓ Verified student {student['website_id']} was deleted from database")
+        
+        # Test deletion of non-existent students
+        print("\n--- Test: Non-existent student deletion ---")
+        delete_data_nonexistent = {
+            "website_ids": [99999, 99998]
+        }
+        
+        with app.test_client() as client:
+            response = client.delete('/delete-students',
+                                   data=json.dumps(delete_data_nonexistent),
+                                   content_type='application/json')
+            
+            response_data = response.get_json()
+            assert response.status_code == 404  # Students not found
+            assert response_data['deleted'] == 0
+            assert response_data['failed'] == 2
+            print("✓ Correctly handled non-existent students")
+        
+        # Test missing data
+        print("\n--- Test: Missing data validation ---")
+        with app.test_client() as client:
+            response = client.delete('/delete-students',
+                                   data=json.dumps({}),
+                                   content_type='application/json')
+            
+            assert response.status_code == 400
+            assert "Missing 'website_ids' array" in response.get_json()['error']
+            print("✓ Correctly validated missing website_ids")
+        
+        print("✅ All delete-students API tests passed!")
+        
+    except Exception as e:
+        print(f"❌ Test failed with error: {e}")
+        # Cleanup any remaining test data
+        for student in test_students:
+            students_manager.delete_record("website_id", student['website_id'])
+        raise
+
+def test_modify_students_api():
+    """Test the /modify-students API endpoint."""
+    print("\n=== Testing /modify-students API endpoint ===")
+    
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    students_manager = multi_manager.get_manager("craffft_students")
+    
+    # Add a test student to modify
+    test_student = {
+        "record_id": "rectestmod001",
+        "first_name": "ModifyTest",
+        "last_name": "Original",
+        "gamer_tag": "@modifyme",
+        "website_id": "9993",
+        "current_class": "test>1",
+        "current_quest": "",
+        "current_step": "",
+        "quest_progress_percentage": "0"
+    }
+    
+    success = students_manager.add_record(test_student)
+    assert success, "Failed to add test student for modification"
+    print(f"✓ Added test student: {test_student['first_name']} {test_student['last_name']} (ID: {test_student['website_id']})")
+    
+    try:
+        # Test successful modification of both names
+        print("\n--- Test: Modify both first and last name ---")
+        modify_data = {
+            "students": [
+                {
+                    "website_id": 9993,
+                    "first_name": "ModifiedFirst",
+                    "last_name": "ModifiedLast"
+                }
+            ]
+        }
+        
+        with app.test_client() as client:
+            response = client.put('/modify-students',
+                                data=json.dumps(modify_data),
+                                content_type='application/json')
+            
+            print(f"Modify response status: {response.status_code}")
+            response_data = response.get_json()
+            print(f"Response data: {response_data}")
+            
+            assert response.status_code == 200
+            assert response_data['modified'] == 1
+            assert response_data['failed'] == 0
+            assert len(response_data['modified_students']) == 1
+            assert response_data['modified_students'][0]['updated_fields'] == ['first_name', 'last_name']
+        
+        # Verify the changes in the database
+        updated_student = students_manager.get_row("website_id", "9993")
+        assert updated_student['first_name'] == "ModifiedFirst"
+        assert updated_student['last_name'] == "ModifiedLast"
+        print("✓ Verified both names were updated in database")
+        
+        # Test modifying only first name
+        print("\n--- Test: Modify only first name ---")
+        modify_data_first_only = {
+            "students": [
+                {
+                    "website_id": 9993,
+                    "first_name": "OnlyFirst"
+                }
+            ]
+        }
+        
+        with app.test_client() as client:
+            response = client.put('/modify-students',
+                                data=json.dumps(modify_data_first_only),
+                                content_type='application/json')
+            
+            response_data = response.get_json()
+            assert response.status_code == 200
+            assert response_data['modified_students'][0]['updated_fields'] == ['first_name']
+        
+        # Verify only first name changed
+        updated_student = students_manager.get_row("website_id", "9993")
+        assert updated_student['first_name'] == "OnlyFirst"
+        assert updated_student['last_name'] == "ModifiedLast"  # Should remain the same
+        print("✓ Verified only first name was updated")
+        
+        # Test modification of non-existent student
+        print("\n--- Test: Non-existent student modification ---")
+        modify_data_nonexistent = {
+            "students": [
+                {
+                    "website_id": 99999,
+                    "first_name": "DoesNotExist"
+                }
+            ]
+        }
+        
+        with app.test_client() as client:
+            response = client.put('/modify-students',
+                                data=json.dumps(modify_data_nonexistent),
+                                content_type='application/json')
+            
+            response_data = response.get_json()
+            assert response.status_code == 404  # Student not found
+            assert response_data['modified'] == 0
+            assert response_data['failed'] == 1
+            print("✓ Correctly handled non-existent student")
+        
+        # Test missing data validation
+        print("\n--- Test: Missing data validation ---")
+        with app.test_client() as client:
+            response = client.put('/modify-students',
+                                data=json.dumps({}),
+                                content_type='application/json')
+            
+            assert response.status_code == 400
+            assert "Missing 'students' array" in response.get_json()['error']
+            print("✓ Correctly validated missing students array")
+        
+        print("✅ All modify-students API tests passed!")
+        
+    finally:
+        # Cleanup: Delete test student
+        delete_success = students_manager.delete_record("website_id", "9993")
+        if delete_success:
+            print("✓ Cleaned up test student")
+        else:
+            print("⚠ Failed to clean up test student")
+
 def run_all_tests():
     import sys
     import types
@@ -1263,4 +1495,5 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    run_all_tests()
+    test_delete_students_api()
+    test_modify_students_api()
