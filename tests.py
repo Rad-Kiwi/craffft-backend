@@ -1457,6 +1457,149 @@ def test_modify_students_api():
         else:
             print("⚠ Failed to clean up test student")
 
+def test_add_teacher_api():
+    """Test the /add-teacher API endpoint."""
+    print("\n=== Testing /add-teacher API endpoint ===")
+    
+    multi_manager = AirtableMultiManager.from_environment()
+    multi_manager.discover_and_add_tables_from_base()
+    teachers_manager = multi_manager.get_manager("craffft_teachers")
+    
+    if not teachers_manager:
+        print("SKIP: craffft_teachers table not found")
+        return "SKIPPED"
+    
+    # Test data
+    test_teacher_full = {
+        "website_user_id": "99999",
+        "first_name": "TestTeacher",
+        "last_name": "FullData",
+        "school_name": "Test Elementary School"
+    }
+    
+    test_teacher_minimal = {
+        "website_user_id": "99998",
+        "first_name": "TestTeacher",
+        "last_name": "MinimalData"
+        # No school_name provided
+    }
+    
+    try:
+        # Test 1: Successful teacher addition with all fields
+        print("\n--- Test: Add teacher with all fields ---")
+        with app.test_client() as client:
+            response = client.post('/add-teacher',
+                                 data=json.dumps(test_teacher_full),
+                                 content_type='application/json')
+            
+            print(f"Add teacher response status: {response.status_code}")
+            response_data = response.get_json()
+            print(f"Response data: {response_data}")
+            
+            assert response.status_code == 201
+            assert response_data['message'] == "Teacher added successfully"
+            assert response_data['teacher']['website_user_id'] == "99999"
+            assert response_data['teacher']['first_name'] == "TestTeacher"
+            assert response_data['teacher']['last_name'] == "FullData"
+            assert response_data['teacher']['school_name'] == "Test Elementary School"
+            assert 'record_id' in response_data['teacher']
+        
+        # Verify teacher was added to database
+        added_teacher = teachers_manager.get_row("website_user_id", "99999")
+        assert added_teacher is not None
+        assert added_teacher['first_name'] == "TestTeacher"
+        assert added_teacher['last_name'] == "FullData"
+        assert added_teacher['school_name'] == "Test Elementary School"
+        print("✓ Verified teacher with all fields was added to database")
+        
+        # Test 2: Successful teacher addition with minimal fields
+        print("\n--- Test: Add teacher with minimal fields ---")
+        with app.test_client() as client:
+            response = client.post('/add-teacher',
+                                 data=json.dumps(test_teacher_minimal),
+                                 content_type='application/json')
+            
+            response_data = response.get_json()
+            assert response.status_code == 201
+            assert response_data['teacher']['school_name'] == ""  # Should be empty string
+        
+        # Verify minimal teacher was added to database
+        added_teacher_minimal = teachers_manager.get_row("website_user_id", "99998")
+        assert added_teacher_minimal is not None
+        assert added_teacher_minimal['school_name'] == ""
+        print("✓ Verified teacher with minimal fields was added to database")
+        
+        # Test 3: Duplicate teacher (should fail)
+        print("\n--- Test: Duplicate teacher addition ---")
+        with app.test_client() as client:
+            response = client.post('/add-teacher',
+                                 data=json.dumps(test_teacher_full),  # Same as first test
+                                 content_type='application/json')
+            
+            response_data = response.get_json()
+            assert response.status_code == 409  # Conflict
+            assert "already exists" in response_data['error']
+            print("✓ Correctly prevented duplicate teacher")
+        
+        # Test 4: Missing required fields
+        print("\n--- Test: Missing required fields ---")
+        incomplete_teacher = {
+            "website_user_id": "99997",
+            "first_name": "Incomplete"
+            # Missing last_name
+        }
+        
+        with app.test_client() as client:
+            response = client.post('/add-teacher',
+                                 data=json.dumps(incomplete_teacher),
+                                 content_type='application/json')
+            
+            response_data = response.get_json()
+            assert response.status_code == 400
+            assert "Missing required fields" in response_data['error']
+            assert "last_name" in response_data['error']
+            print("✓ Correctly validated missing required fields")
+        
+        # Test 5: Missing JSON body
+        print("\n--- Test: Missing JSON body ---")
+        with app.test_client() as client:
+            response = client.post('/add-teacher',
+                                 data="invalid json",
+                                 content_type='application/json')
+            
+            assert response.status_code == 400
+            print("✓ Correctly handled missing JSON body")
+        
+        # Test 6: Empty fields validation
+        print("\n--- Test: Empty required fields ---")
+        empty_teacher = {
+            "website_user_id": "",
+            "first_name": "Test",
+            "last_name": "Empty"
+        }
+        
+        with app.test_client() as client:
+            response = client.post('/add-teacher',
+                                 data=json.dumps(empty_teacher),
+                                 content_type='application/json')
+            
+            response_data = response.get_json()
+            assert response.status_code == 400
+            assert "Missing required fields" in response_data['error']
+            print("✓ Correctly validated empty required fields")
+        
+        print("✅ All add-teacher API tests passed!")
+        
+    finally:
+        # Cleanup: Delete test teachers
+        print("\n--- Cleanup: Deleting test teachers ---")
+        for website_user_id in ["99999", "99998"]:
+            delete_success = teachers_manager.delete_record("website_user_id", website_user_id)
+            if delete_success:
+                print(f"✓ Deleted test teacher with website_user_id: {website_user_id}")
+            else:
+                print(f"⚠ Failed to delete test teacher with website_user_id: {website_user_id}")
+
 def run_all_tests():
     import sys
     import types
@@ -1495,5 +1638,4 @@ def run_all_tests():
         print(f"{failures} test(s) failed.")
 
 if __name__ == "__main__":
-    test_delete_students_api()
-    test_modify_students_api()
+    test_add_teacher_api()

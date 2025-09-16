@@ -1,5 +1,6 @@
 requests
 flask
+flask-restx
 airtable-python-wrapper
 python-dotenv
 gunicorn

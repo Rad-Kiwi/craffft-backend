@@ -78,6 +78,10 @@ def home():
     return """
     <h1>Craffft Backend - Up and running!</h1>
     <p><a href="https://github.com/radkiwi/craffft-backend">View all routes on GitHub</a></p>
+    <h2>API Documentation:</h2>
+    <ul>
+        <li><a href="/docs/">📚 Interactive API Documentation (Swagger)</a> - Test all endpoints with live examples</li>
+    </ul>
     <h2>Tools:</h2>
     <ul>
         <li><a href="/quest-generator">🎮 Quest Generator</a> - Create new quests and steps</li>
@@ -86,6 +90,7 @@ def home():
     """
 
 
+@app.route("/data/csv/<table_name>", methods=['GET'])
 @app.route("/get-table-as-csv/<table_name>", methods=['GET'])
 def get_table_manager(table_name):
     csv_data = multi_manager.get_csv_data(table_name)
@@ -94,6 +99,7 @@ def get_table_manager(table_name):
     return Response(csv_data, mimetype='text/csv')
 
 
+@app.route("/sync/update-all", methods=['POST'])
 @app.route("/update-server-from-airtable", methods=['POST'])
 def update_server_from_airtable():
     results = multi_manager.update_all_tables()
@@ -105,6 +111,7 @@ def update_server_from_airtable():
     else:
         return Response(f"Failed to update from Airtable: {results}", status=500)
 
+@app.route("/sync/update-table", methods=['POST'])
 @app.route("/update-table-from-airtable", methods=['POST'])
 def update_table_from_airtable():
     """
@@ -162,6 +169,7 @@ def update_table_from_airtable():
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
+@app.route("/data/json/<table_name>", methods=['GET'])
 @app.route("/get-table-as-json/<table_name>", methods=['GET'])
 def get_tile_data(table_name):
     """
@@ -192,6 +200,7 @@ def get_tile_data(table_name):
 
 
 
+@app.route("/students/get-by-website-id/<website_id>", methods=['GET'])
 @app.route("/get-student-data-from-websiteId/<website_id>", methods=['GET'])
 def get_student_data_from_website(website_id):
     if not website_id:
@@ -212,6 +221,7 @@ def get_student_data_from_website(website_id):
     parsed_row = parse_database_row(student_row)
     return jsonify(parsed_row)
 
+@app.route("/students/get-by-record/<student_record>", methods=['GET'])
 @app.route("/get-student-data-from-record/<student_record>", methods=['GET'])
 def get_student_data(student_record):
     if not student_record:
@@ -232,6 +242,7 @@ def get_student_data(student_record):
     parsed_row = parse_database_row(student_row)
     return jsonify(parsed_row)
 
+@app.route("/data/query", methods=['POST'])
 @app.route("/get-value-from-db", methods=['POST'])
 def get_value_from_db():
     data = request.get_json()
@@ -258,6 +269,7 @@ def get_value_from_db():
         return jsonify(row)
 
 
+@app.route("/students/dashboard/<classroom_id>", methods=['GET'])
 @app.route("/get-student-data-dashboard/<classroom_id>", methods=['GET'])
 def get_students_for_dashboard(classroom_id):
     if not classroom_id:
@@ -274,6 +286,7 @@ def get_students_for_dashboard(classroom_id):
     parsed_dashboard = deep_jsonify(dashboard_info, parse_stringified_lists=True)
     return jsonify(parsed_dashboard)
 
+@app.route("/teachers/get/<id>", methods=['GET'])
 @app.route("/get-teacher-data/<id>", methods=['GET'])
 def get_teacher_data(id):
     if not id:
@@ -288,7 +301,75 @@ def get_teacher_data(id):
 
     return jsonify(teacher_info)
 
+@app.route("/teacher/add", methods=['POST'])
+@app.route("/add-teacher", methods=['POST'])
+def add_teacher():
+    """
+    Add a teacher to the craffft_teachers table.
+    
+    Expected JSON format:
+    {
+        "website_user_id": "12345",
+        "first_name": "John",
+        "last_name": "Smith",
+        "school_name": "Example School"  // optional
+    }
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing JSON body"}), 400
 
+    # Validate required fields
+    required_fields = ['website_user_id', 'first_name', 'last_name']
+    missing_fields = [field for field in required_fields if not data.get(field)]
+    
+    if missing_fields:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
+    
+    # Get the teachers table manager
+    teachers_manager = multi_manager.get_manager("craffft_teachers")
+    
+    # Check if teacher already exists
+    existing_teacher = teachers_manager.get_row("website_user_id", str(data['website_user_id']))
+    if existing_teacher:
+        return jsonify({
+            "error": f"Teacher with website_user_id {data['website_user_id']} already exists"
+        }), 409  # Conflict
+    
+    # Generate record ID
+    record_id = f"rec{str(uuid.uuid4()).replace('-', '')[:10]}"
+    
+    # Create teacher record
+    teacher_record = {
+        'record_id': record_id,
+        'website_user_id': str(data['website_user_id']),
+        'first_name': data['first_name'].strip(),
+        'last_name': data['last_name'].strip(),
+        'school_name': data.get('school_name', '').strip() if data.get('school_name') else ''
+    }
+    
+    # Add the teacher to the database
+    success = teachers_manager.add_record(teacher_record)
+    
+    if success:
+        # Mark table as modified for Airtable sync
+        multi_manager.mark_table_as_modified("craffft_teachers")
+        
+        return jsonify({
+            "message": "Teacher added successfully",
+            "teacher": {
+                "record_id": record_id,
+                "website_user_id": data['website_user_id'],
+                "first_name": data['first_name'],
+                "last_name": data['last_name'],
+                "school_name": teacher_record['school_name']
+            }
+        }), 201
+    else:
+        return jsonify({"error": "Failed to add teacher to database"}), 500
+
+
+@app.route("/quests/steps", methods=['GET'])
 @app.route("/get-step-data", methods=['GET'])
 def get_step_data():
     """
@@ -337,6 +418,7 @@ def get_step_data():
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
+@app.route("/data/modify-field", methods=['POST'])
 @app.route("/modify-field", methods=['POST'])
 def update_field():
     data = request.get_json()
@@ -362,6 +444,7 @@ def update_field():
     else:
         return Response(f"Failed to update field for table: {table_name}, {column_containing_reference}: {reference_value}, column: {target_column}", status=500)
 
+@app.route("/students/update-current-step", methods=['GET'])
 @app.route("/update-student-current-step", methods=['GET'])
 def update_student_current_step():
     # get websiteId and current-step as params
@@ -392,6 +475,7 @@ def update_student_current_step():
     }), 200
 
 
+@app.route("/students/update-and-check-quest", methods=['GET'])
 @app.route("/update-and-check-quest", methods=['GET'])
 def update_and_check_quest():
     """
@@ -437,6 +521,7 @@ def update_and_check_quest():
     })
 
 
+@app.route("/students/add", methods=['POST'])
 @app.route("/add-students", methods=['POST'])
 def add_students():
     """
@@ -450,7 +535,7 @@ def add_students():
             {
                 "first_name": "John",
                 "last_name": "Doe",
-                "gamer_tag": "johndoe123", 
+                "gamer_tag": "johndoe123",  // optional
                 "website_id": 12345,
                 "current_class": 1
             },
@@ -485,8 +570,8 @@ def add_students():
         
         for i, student in enumerate(students_list):
             try:
-                # Validate required fields
-                required_fields = ['first_name', 'last_name', 'gamer_tag', 'website_id', 'current_class']
+                # Validate required fields (gamer_tag is now optional)
+                required_fields = ['first_name', 'last_name', 'website_id', 'current_class']
                 missing_fields = [field for field in required_fields if field not in student or student.get(field) is None]
                 
                 if missing_fields:
@@ -521,7 +606,7 @@ def add_students():
                     'record_id': record_id,
                     'first_name': student['first_name'].strip(),
                     'last_name': student['last_name'].strip(),
-                    'gamer_tag': student['gamer_tag'].strip(),
+                    'gamer_tag': student.get('gamer_tag', '').strip() if student.get('gamer_tag') else '',
                     'website_id': str(student['website_id']),  # Convert int to string for database
                     'current_class': f"{teacher_website_id}>{str(student['current_class'])}",  # Use teacher_website_id instead of name
                     'current_quest': student.get('current_quest', ''),
@@ -537,7 +622,7 @@ def add_students():
                         "record_id": record_id,
                         "first_name": student['first_name'],
                         "last_name": student['last_name'],
-                        "gamer_tag": student['gamer_tag'],
+                        "gamer_tag": student.get('gamer_tag', ''),
                         "website_id": student['website_id']  # Keep as integer in response
                     })
                 else:
@@ -595,6 +680,7 @@ def add_students():
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
+@app.route("/students/delete", methods=['DELETE'])
 @app.route("/delete-students", methods=['DELETE'])
 def delete_students():
     """
@@ -659,6 +745,7 @@ def delete_students():
     }), status_code
 
 
+@app.route("/students/modify", methods=['PUT'])
 @app.route("/modify-students", methods=['PUT'])
 def modify_students():
     """
@@ -754,6 +841,7 @@ def modify_students():
     }), status_code
 
 
+@app.route("/quests/assign", methods=['POST'])
 @app.route("/assign-quests", methods=['POST'])
 def assign_quests():
     """
@@ -823,6 +911,7 @@ def assign_quests():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/quests/assign-to-class", methods=['POST'])
 @app.route("/assign-quest-to-class", methods=['POST'])
 def assign_quest_to_class():
     """
@@ -934,6 +1023,7 @@ def assign_quest_to_class():
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
+@app.route("/quests/assign-achievement", methods=['POST'])
 @app.route("/assign-achievement-to-student", methods=['POST'])
 def assign_achievement_to_student():
     """
@@ -1039,6 +1129,7 @@ def assign_achievement_to_student():
         return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
+@app.route("/sync/upload", methods=['POST'])
 @app.route("/upload-to-airtable", methods=['POST'])
 def upload_to_airtable():
     """
@@ -1098,6 +1189,7 @@ def upload_to_airtable():
 
 
 
+@app.route("/sync/modified-tables", methods=['GET'])
 @app.route("/get-modified-tables", methods=['GET'])
 def get_modified_tables():
     """
@@ -1108,6 +1200,11 @@ def get_modified_tables():
         "modified_tables": modified_tables,
         "count": len(modified_tables)
     })
+
+
+# Set up API documentation after all routes are defined
+from docs.swagger_docs import setup_api_docs
+api = setup_api_docs(app)
 
 
 # --- Scheduler Initialisation ---

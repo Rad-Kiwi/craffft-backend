@@ -15,6 +15,23 @@ The backend manages multiple Airtable tables containing student data, teacher in
 - **Database Abstraction**: Supports both SQLite (development) and PostgreSQL (production)
 - **Automatic Data Sync**: Daily scheduled updates from Airtable
 - **Deep JSON Serialization**: Handles complex data structures including stringified lists
+- **Interactive API Documentation**: Comprehensive Swagger/OpenAPI documentation with live testing
+
+## API Documentation
+
+The backend includes comprehensive interactive API documentation powered by Swagger/OpenAPI:
+
+- **Local Development**: `http://localhost:5000/docs/`
+- **Production**: `https://craffft-api-e21e23f89690.herokuapp.com/docs/`
+
+Features:
+- 📚 Interactive documentation for all endpoints
+- 🧪 "Try it out" functionality for live API testing
+- 📋 Complete request/response schemas with examples
+- 🎯 Organized by functional areas (Students, Teachers, Quests, Database, Sync)
+- 📖 Detailed descriptions and usage instructions
+
+See the [`docs/`](./docs/) folder for documentation source files.
 
 
 ## Installation
