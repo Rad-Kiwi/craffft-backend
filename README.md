@@ -79,43 +79,8 @@ The app will be available at [http://127.0.0.1:5000/](http://127.0.0.1:5000/).
 
 ## Endpoints
 
-### Health Check
-- `GET /` — Returns API status and links to available tools
-
-### Student Data
-- `GET /get-student-data-from-record/<student_record>` — Get individual student data by record ID
-- `GET /get-student-data-from-websiteId/<website_id>` — Get individual student data by website ID
-- `GET /get-student-data-dashboard/<classroom_id>` — Get dashboard data for all students in a classroom
-- `GET /update-student-current-step` — Update a student's current step (query params: websiteId, current-step)
-- `GET /update-and-check-quest` — Update student's step and check for quest changes (query params: websiteId, current-step, allow-quest-update)
-
-### Student Management
-- `POST /add-students` — Add multiple students to the database with teacher assignment
-- `DELETE /delete-students` — Delete multiple students by their website IDs
-- `PUT /modify-students` — Modify student names (first_name, last_name) by website IDs
-- `POST /assign-quests` — Assign quests to multiple students
-- `POST /assign-quest-to-class` — Assign a quest to all students in a specific class
-- `POST /assign-achievement-to-student` — Assign an achievement to a student
-
-### Teacher Data  
-- `GET /get-teacher-data/<id>` — Get teacher information by website user ID
-
-### Quest and Step Data
-- `GET /get-step-data` — Get step data (optional query param: step for specific step)
-
-### Table Management
-- `GET /get-table-as-csv/<table_name>` — Download table data as CSV
-- `GET /get-table-as-json/<table_name>` — Get table data as JSON
-- `GET /update-server-from-airtable` — Manually trigger update from Airtable for all tables
-- `POST /update-table-from-airtable` — Update specific table from Airtable (supports force_delete option)
-
-### Database Operations
-- `POST /get-value-from-db` — Query specific values from database tables
-- `POST /modify-field` — Update specific fields in database records
-
-### Airtable Sync
-- `POST /upload-to-airtable` — Upload modified data back to Airtable
-- `GET /get-modified-tables` — List tables that have been modified locally
+View endpoint documentation here:
+[https://craffft-api-e21e23f89690.herokuapp.com/docs/](https://craffft-api-e21e23f89690.herokuapp.com/docs/)
 
 ## Database
 
@@ -123,6 +88,10 @@ The application supports two database modes:
 
 - **Development**: Uses SQLite with data stored in `data/airtable_data.db`
 - **Production**: Uses PostgreSQL (automatically detected via `DATABASE_URL` environment variable)
+
+If you wish to view the production database, there is a UI for online viewing here:
+https://craffft-api-e21e23f89690.herokuapp.com/admin/login
+(DM repo owners for access)
 
 Tables are automatically created and populated from Airtable data:
 - `craffft_students` — Student information and progress
@@ -173,6 +142,9 @@ Tests automatically:
 - Verify API responses and status codes
 - Confirm database changes are persisted
 - Clean up test data after completion
+
+### Niche Tests
+There is a folder for niche tests that I have been using to test issues that don't come up often. They are just for storage in case the issue comes up again and can mostly be ignored
 
 **Note**: Tests use the same database configuration as the main application, so ensure your environment variables are properly configured before running tests, and ensure you have a copy of the database locally
 
