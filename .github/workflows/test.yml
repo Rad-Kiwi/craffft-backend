@@ -56,12 +56,14 @@ jobs:
           # Use mock values that will allow tests to run but skip API calls
           AIRTABLE_BASE_ID="mock_base_id_for_testing"
           AIRTABLE_API_KEY="mock_api_key_for_testing"
+          echo "CI_TESTING=true" >> .env.local
+        else
+          echo "✅ Repository secrets configured - using real credentials for testing"
         fi
         
         echo "AIRTABLE_BASE_ID=$AIRTABLE_BASE_ID" >> .env.local
         echo "AIRTABLE_API_KEY=$AIRTABLE_API_KEY" >> .env.local
         echo "ENVIRONMENT_MODE=Development" >> .env.local
-        echo "CI_TESTING=true" >> .env.local
         
     - name: Debug environment variables
       run: |
@@ -187,12 +189,14 @@ jobs:
           # Use mock values that will allow tests to run but skip API calls
           AIRTABLE_BASE_ID="mock_base_id_for_testing"
           AIRTABLE_API_KEY="mock_api_key_for_testing"
+          echo "CI_TESTING=true" >> .env.local
+        else
+          echo "✅ Repository secrets configured - using real credentials for coverage testing"
         fi
         
         echo "AIRTABLE_BASE_ID=$AIRTABLE_BASE_ID" >> .env.local
         echo "AIRTABLE_API_KEY=$AIRTABLE_API_KEY" >> .env.local
         echo "ENVIRONMENT_MODE=Development" >> .env.local
-        echo "CI_TESTING=true" >> .env.local
         
     - name: Debug environment variables
       run: |
