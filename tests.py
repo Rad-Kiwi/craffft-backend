@@ -1603,39 +1603,93 @@ def test_add_teacher_api():
 def run_all_tests():
     import sys
     import types
+    import traceback
+    import time
+    
+    print("🧪 Starting comprehensive test suite...")
+    print("=" * 80)
+    
     current_module = sys.modules[__name__]
     test_functions = [getattr(current_module, name) for name in dir(current_module) if name.startswith('test_') and isinstance(getattr(current_module, name), types.FunctionType)]
     failures = 0
     skipped = 0
+    failed_tests = []
     
-    for test_func in test_functions:
+    start_time = time.time()
+    
+    for i, test_func in enumerate(test_functions, 1):
+        test_start = time.time()
+        print(f"\n[{i:2d}/{len(test_functions)}] Running: {test_func.__name__}")
+        print("-" * 60)
+        
         try:
             result = test_func()
+            test_duration = time.time() - test_start
+            
             if result == "SKIPPED":
-                print(f"SKIP: {test_func.__name__}")
+                print(f"⏭️  SKIPPED: {test_func.__name__} ({test_duration:.2f}s)")
                 skipped += 1
             else:
-                print(f"PASS: {test_func.__name__}")
-        except AssertionError:
-            print(f"FAIL: {test_func.__name__}")
+                print(f"✅ PASSED: {test_func.__name__} ({test_duration:.2f}s)")
+                
+        except AssertionError as e:
+            test_duration = time.time() - test_start
+            print(f"❌ FAILED: {test_func.__name__} ({test_duration:.2f}s)")
+            print(f"   📋 Assertion Error: {str(e)}")
+            print("   📍 Full traceback:")
+            traceback.print_exc(limit=5)
             failures += 1
+            failed_tests.append({
+                'name': test_func.__name__,
+                'error_type': 'AssertionError',
+                'error_message': str(e),
+                'duration': test_duration
+            })
+            
         except Exception as e:
-            print(f"ERROR: {test_func.__name__} - {e}")
+            test_duration = time.time() - test_start
+            print(f"💥 ERROR: {test_func.__name__} ({test_duration:.2f}s)")
+            print(f"   📋 Exception: {type(e).__name__}: {str(e)}")
+            print("   📍 Full traceback:")
+            traceback.print_exc(limit=5)
             failures += 1
+            failed_tests.append({
+                'name': test_func.__name__,
+                'error_type': type(e).__name__,
+                'error_message': str(e),
+                'duration': test_duration
+            })
     
-    # Summary
+    # Detailed Summary
+    total_duration = time.time() - start_time
     total_tests = len(test_functions)
     passed = total_tests - failures - skipped
-    print(f"\n=== Test Summary ===")
-    print(f"Total tests: {total_tests}")
-    print(f"Passed: {passed}")
-    print(f"Failed: {failures}")
-    print(f"Skipped: {skipped}")
+    
+    print("\n" + "=" * 80)
+    print("📊 DETAILED TEST SUMMARY")
+    print("=" * 80)
+    print(f"⏱️  Total duration: {total_duration:.2f}s")
+    print(f"📈 Total tests: {total_tests}")
+    print(f"✅ Passed: {passed}")
+    print(f"❌ Failed: {failures}")
+    print(f"⏭️  Skipped: {skipped}")
+    print(f"📊 Success rate: {(passed/total_tests*100):.1f}%" if total_tests > 0 else "0.0%")
+    
+    if failed_tests:
+        print(f"\n💥 FAILED TESTS DETAILS:")
+        print("-" * 40)
+        for i, failed_test in enumerate(failed_tests, 1):
+            print(f"{i}. {failed_test['name']} ({failed_test['duration']:.2f}s)")
+            print(f"   Type: {failed_test['error_type']}")
+            print(f"   Error: {failed_test['error_message']}")
+            print()
     
     if failures == 0:
-        print("All non-skipped tests passed!")
+        print("🎉 All non-skipped tests passed!")
+        return 0  # Success exit code
     else:
-        print(f"{failures} test(s) failed.")
+        print(f"💔 {failures} test(s) failed. Check details above.")
+        return 1  # Failure exit code
 
 if __name__ == "__main__":
     test_add_teacher_api()
