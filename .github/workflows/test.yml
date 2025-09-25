@@ -10,6 +10,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    environment: ci-tests  # Reference the environment with secrets
     
     strategy:
       matrix:
@@ -45,14 +46,12 @@ jobs:
         
         if [ -z "$AIRTABLE_BASE_ID" ]; then
           echo "ERROR: AIRTABLE_BASE_ID secret not configured in GitHub repository settings"
-          echo "Please add repository secrets at: https://github.com/Tehsurfer/craffft-backend/settings/secrets/actions"
-          exit 1
+          echo "Please add repository secrets at: https://github.com/rad-kiwi/craffft-backend/settings/secrets/actions"
         fi
         
         if [ -z "$AIRTABLE_API_KEY" ]; then
           echo "ERROR: AIRTABLE_API_KEY secret not configured in GitHub repository settings"
-          echo "Please add repository secrets at: https://github.com/Tehsurfer/craffft-backend/settings/secrets/actions"
-          exit 1
+          echo "Please add repository secrets at: https://github.com/rad-kiwi/craffft-backend/settings/secrets/actions"
         fi
         
         echo "AIRTABLE_BASE_ID=$AIRTABLE_BASE_ID" >> .env.local
@@ -65,6 +64,17 @@ jobs:
         echo "System AIRTABLE_API_KEY: ${AIRTABLE_API_KEY:-'NOT SET'}"
         echo "System AIRTABLE_BASE_ID: ${AIRTABLE_BASE_ID:-'NOT SET'}"
         echo "System ENVIRONMENT_MODE: ${ENVIRONMENT_MODE:-'NOT SET'}"
+        echo ""
+        echo "=== Secret Access Debug ==="
+        echo "Direct secret access test:"
+        echo "AIRTABLE_BASE_ID from secret: ${{ secrets.AIRTABLE_BASE_ID || 'SECRET_NOT_FOUND' }}"
+        echo "AIRTABLE_API_KEY exists: ${{ secrets.AIRTABLE_API_KEY && 'YES' || 'NO' }}"
+        echo ""
+        echo "=== GitHub Context Debug ==="
+        echo "Repository: ${{ github.repository }}"
+        echo "Actor: ${{ github.actor }}"
+        echo "Event: ${{ github.event_name }}"
+        echo "Ref: ${{ github.ref }}"
         echo ""
         echo "=== .env.local file contents ==="
         if [ -f .env.local ]; then
@@ -149,6 +159,7 @@ jobs:
   test-coverage:
     runs-on: ubuntu-latest
     needs: test
+    environment: ci-tests  # Reference the environment with secrets
     
     env:
       AIRTABLE_BASE_ID: ${{ secrets.AIRTABLE_BASE_ID }}
@@ -172,13 +183,13 @@ jobs:
         
         if [ -z "$AIRTABLE_BASE_ID" ]; then
           echo "ERROR: AIRTABLE_BASE_ID secret not configured in GitHub repository settings"
-          echo "Please add repository secrets at: https://github.com/Tehsurfer/craffft-backend/settings/secrets/actions"
+          echo "Please add repository secrets at: https://github.com/rad-kiwi/craffft-backend/settings/secrets/actions"
           exit 1
         fi
         
         if [ -z "$AIRTABLE_API_KEY" ]; then
           echo "ERROR: AIRTABLE_API_KEY secret not configured in GitHub repository settings"
-          echo "Please add repository secrets at: https://github.com/Tehsurfer/craffft-backend/settings/secrets/actions"
+          echo "Please add repository secrets at: https://github.com/rad-kiwi/craffft-backend/settings/secrets/actions"
           exit 1
         fi
         
