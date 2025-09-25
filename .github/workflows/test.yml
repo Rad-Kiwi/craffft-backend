@@ -10,6 +10,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    environment: ci-tests  # Reference the environment with secrets
     
     strategy:
       matrix:
@@ -158,6 +159,7 @@ jobs:
   test-coverage:
     runs-on: ubuntu-latest
     needs: test
+    environment: ci-tests  # Reference the environment with secrets
     
     env:
       AIRTABLE_BASE_ID: ${{ secrets.AIRTABLE_BASE_ID }}
