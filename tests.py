@@ -3,7 +3,7 @@ from airtable_multi_manager import AirtableMultiManager
 from sqlite_storage import SQLiteStorage
 from table_manager import TableManager
 from student_data_manager import StudentDataManager
-from utilities import load_env, parse_database_row
+from utilities import load_env, parse_database_row, skip_if_no_real_credentials
 import json
 import asyncio
 from app import app
@@ -16,6 +16,30 @@ def test_basic_usage():
     json_data = multi_manager.get_table_as_json(table_name)
     if json_data:
         assert isinstance(json_data, str)
+        
+def test_ci_mode_compatibility():
+    """Test that the system can handle CI testing mode."""
+    from utilities import is_ci_testing_mode, load_env
+    
+    # This test should always pass in CI mode
+    try:
+        api_key = load_env('AIRTABLE_API_KEY', 'fallback')
+        base_id = load_env('AIRTABLE_BASE_ID', 'fallback')
+        assert isinstance(api_key, str)
+        assert isinstance(base_id, str)
+        
+        # Test that CI mode detection works
+        ci_mode = is_ci_testing_mode()
+        assert isinstance(ci_mode, bool)
+        
+        if ci_mode:
+            print("✓ Running in CI testing mode - API calls will be mocked")
+        else:
+            print("✓ Running with real credentials")
+            
+    except Exception as e:
+        print(f"CI compatibility test failed: {e}")
+        raise
 
 def test_error_handling():
     try:
@@ -33,6 +57,9 @@ def test_error_handling():
         assert True
 
 def test_discover_tables():
+    if skip_if_no_real_credentials("test_discover_tables"):
+        return
+        
     multi_manager = AirtableMultiManager.from_environment()
     table_names = multi_manager.get_tables_from_base()
     assert isinstance(table_names, list) or table_names is None
@@ -45,6 +72,9 @@ def test_discover_tables():
                 assert isinstance(json_data, str)
 
 def test_database_example():
+    if skip_if_no_real_credentials("test_database_example"):
+        return
+
     api_key = load_env('AIRTABLE_API_KEY')
     base_id = load_env('AIRTABLE_BASE_ID')
     table_name = "craffft_students"

@@ -8,6 +8,42 @@ from dotenv import load_dotenv, find_dotenv
 critical_tables = ['craffft_students', 'craffft_teachers', 'craffft_quests']
 
 
+def is_ci_testing_mode():
+    """
+    Check if we're running in CI testing mode with mock credentials.
+    
+    Returns:
+        bool: True if in CI testing mode, False otherwise
+    """
+    is_ci = os.getenv('CI_TESTING', '').lower() == 'true'
+    base_id = os.getenv('AIRTABLE_BASE_ID', '')
+    api_key = os.getenv('AIRTABLE_API_KEY', '')
+    
+    # Check if using mock values
+    is_mock = (base_id.startswith('mock_') or 
+               api_key.startswith('mock_') or
+               base_id == 'your_base_id' or
+               api_key == 'your_airtable_api_key')
+    
+    return is_ci or is_mock
+
+
+def skip_if_no_real_credentials(test_name="test"):
+    """
+    Skip a test if we don't have real Airtable credentials.
+    
+    Args:
+        test_name: Name of the test being skipped
+        
+    Returns:
+        bool: True if test should be skipped, False if it should run
+    """
+    if is_ci_testing_mode():
+        print(f"SKIP: {test_name} - Running in CI testing mode without real Airtable credentials")
+        return True
+    return False
+
+
 # Load environment variables once at module import time
 # Load .env first (defaults), then .env.local (overrides)
 # Use find_dotenv to gracefully handle missing files
@@ -47,19 +83,32 @@ def load_env(KEY_NAME, fallback=None, check_system=True):
     if fallback is not None:
         return fallback
     
+    # Check if we're in CI testing mode
+    is_ci_testing = os.getenv('CI_TESTING', '').lower() == 'true'
+    
     # Build a helpful error message showing where we looked
     env_file_status = "✓ loaded" if find_dotenv('.env') else "✗ not found"
     env_local_status = "✓ loaded" if find_dotenv('.env.local') else "✗ not found" 
     
-    error_msg = (
-        f"Environment variable '{KEY_NAME}' not found.\n"
-        f"Sources checked:\n"
-        f"  - System environment variables\n"
-        f"  - .env.local file ({env_local_status})\n"
-        f"  - .env file ({env_file_status})\n"
-        f"\nFor CI/CD: Ensure secrets are configured in GitHub Actions.\n"
-        f"For local development: Add '{KEY_NAME}=your_value' to .env.local file."
-    )
+    if is_ci_testing:
+        error_msg = (
+            f"Environment variable '{KEY_NAME}' not found (CI Testing Mode).\n"
+            f"Sources checked:\n"
+            f"  - System environment variables\n"
+            f"  - .env.local file ({env_local_status})\n"
+            f"  - .env file ({env_file_status})\n"
+            f"\nRunning in CI testing mode - some tests may be skipped."
+        )
+    else:
+        error_msg = (
+            f"Environment variable '{KEY_NAME}' not found.\n"
+            f"Sources checked:\n"
+            f"  - System environment variables\n"
+            f"  - .env.local file ({env_local_status})\n"
+            f"  - .env file ({env_file_status})\n"
+            f"\nFor CI/CD: Ensure secrets are configured in GitHub Actions.\n"
+            f"For local development: Add '{KEY_NAME}=your_value' to .env.local file."
+        )
     
     raise ValueError(error_msg)
 

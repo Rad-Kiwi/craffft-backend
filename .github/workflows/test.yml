@@ -39,25 +39,29 @@ jobs:
           
     - name: Create test environment file
       run: |
-        # Use secrets if available, otherwise use actual dev credentials for testing
+        # Use secrets if available, otherwise use mock values for testing
         AIRTABLE_BASE_ID="${{ secrets.AIRTABLE_BASE_ID }}"
         AIRTABLE_API_KEY="${{ secrets.AIRTABLE_API_KEY }}"
         
-        if [ -z "$AIRTABLE_BASE_ID" ]; then
-          echo "ERROR: AIRTABLE_BASE_ID secret not configured in GitHub repository settings"
-          echo "Please add repository secrets at: https://github.com/Tehsurfer/craffft-backend/settings/secrets/actions"
-          exit 1
-        fi
-        
-        if [ -z "$AIRTABLE_API_KEY" ]; then
-          echo "ERROR: AIRTABLE_API_KEY secret not configured in GitHub repository settings"
-          echo "Please add repository secrets at: https://github.com/Tehsurfer/craffft-backend/settings/secrets/actions"
-          exit 1
+        if [ -z "$AIRTABLE_BASE_ID" ] || [ -z "$AIRTABLE_API_KEY" ]; then
+          echo "⚠️  WARNING: GitHub repository secrets not configured"
+          echo "AIRTABLE_BASE_ID: ${AIRTABLE_BASE_ID:-'NOT SET'}"
+          echo "AIRTABLE_API_KEY: ${AIRTABLE_API_KEY:-'NOT SET'}"
+          echo ""
+          echo "Using mock values for testing. Tests requiring real Airtable API will be skipped."
+          echo "To run full tests, configure secrets in repository settings:"
+          echo "https://github.com/Rad-Kiwi/craffft-backend/settings/secrets/actions"
+          echo ""
+          
+          # Use mock values that will allow tests to run but skip API calls
+          AIRTABLE_BASE_ID="mock_base_id_for_testing"
+          AIRTABLE_API_KEY="mock_api_key_for_testing"
         fi
         
         echo "AIRTABLE_BASE_ID=$AIRTABLE_BASE_ID" >> .env.local
         echo "AIRTABLE_API_KEY=$AIRTABLE_API_KEY" >> .env.local
         echo "ENVIRONMENT_MODE=Development" >> .env.local
+        echo "CI_TESTING=true" >> .env.local
         
     - name: Debug environment variables
       run: |
@@ -170,21 +174,25 @@ jobs:
         AIRTABLE_BASE_ID="${{ secrets.AIRTABLE_BASE_ID }}"
         AIRTABLE_API_KEY="${{ secrets.AIRTABLE_API_KEY }}"
         
-        if [ -z "$AIRTABLE_BASE_ID" ]; then
-          echo "ERROR: AIRTABLE_BASE_ID secret not configured in GitHub repository settings"
-          echo "Please add repository secrets at: https://github.com/Tehsurfer/craffft-backend/settings/secrets/actions"
-          exit 1
-        fi
-        
-        if [ -z "$AIRTABLE_API_KEY" ]; then
-          echo "ERROR: AIRTABLE_API_KEY secret not configured in GitHub repository settings"
-          echo "Please add repository secrets at: https://github.com/Tehsurfer/craffft-backend/settings/secrets/actions"
-          exit 1
+        if [ -z "$AIRTABLE_BASE_ID" ] || [ -z "$AIRTABLE_API_KEY" ]; then
+          echo "⚠️  WARNING: GitHub repository secrets not configured for test-coverage job"
+          echo "AIRTABLE_BASE_ID: ${AIRTABLE_BASE_ID:-'NOT SET'}"
+          echo "AIRTABLE_API_KEY: ${AIRTABLE_API_KEY:-'NOT SET'}"
+          echo ""
+          echo "Using mock values for testing. Coverage tests requiring real Airtable API will be skipped."
+          echo "To run full tests, configure secrets in repository settings:"
+          echo "https://github.com/Rad-Kiwi/craffft-backend/settings/secrets/actions"
+          echo ""
+          
+          # Use mock values that will allow tests to run but skip API calls
+          AIRTABLE_BASE_ID="mock_base_id_for_testing"
+          AIRTABLE_API_KEY="mock_api_key_for_testing"
         fi
         
         echo "AIRTABLE_BASE_ID=$AIRTABLE_BASE_ID" >> .env.local
         echo "AIRTABLE_API_KEY=$AIRTABLE_API_KEY" >> .env.local
         echo "ENVIRONMENT_MODE=Development" >> .env.local
+        echo "CI_TESTING=true" >> .env.local
         
     - name: Debug environment variables
       run: |

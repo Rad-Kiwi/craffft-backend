@@ -5,7 +5,7 @@ from airtable_multi_manager import AirtableMultiManager
 from student_data_manager import StudentDataManager
 import threading
 from scheduler import DailyAirtableUploader
-from utilities import load_env, deep_jsonify, parse_database_row, critical_tables
+from utilities import load_env, deep_jsonify, parse_database_row, critical_tables, is_ci_testing_mode
 from quest_routes import quest_bp
 from admin_routes import admin_bp
 import uuid
@@ -30,24 +30,29 @@ try:
     results = multi_manager.discover_and_add_tables_from_base()
     print(f"Added tables: {results}")
     
-    # Check if database has data - only update from Airtable if empty
-    database_has_data = multi_manager.sqlite_storage.has_data_in_critical_tables()
-    
-    if not database_has_data:
-        print("Database appears empty - performing initial sync from Airtable")
-        results = multi_manager.update_all_tables()
-        print("Initial sync results: ", results)
-        
-        # Check if critical tables failed
-        failed_critical = [table for table in critical_tables if table in results and 'Error' in str(results[table])]
-        if failed_critical:
-            print(f"Warning: Critical tables failed to update: {failed_critical}")
-            
+    # Skip Airtable sync in CI testing mode
+    if is_ci_testing_mode():
+        print("CI Testing Mode: Skipping Airtable sync - using mock data")
+        student_data_manager = StudentDataManager(multi_manager)
     else:
-        print("Database has existing data - skipping initial sync from Airtable")
-    
-    # Set up StudentDataManager
-    student_data_manager = StudentDataManager(multi_manager)
+        # Check if database has data - only update from Airtable if empty
+        database_has_data = multi_manager.sqlite_storage.has_data_in_critical_tables()
+        
+        if not database_has_data:
+            print("Database appears empty - performing initial sync from Airtable")
+            results = multi_manager.update_all_tables()
+            print("Initial sync results: ", results)
+            
+            # Check if critical tables failed
+            failed_critical = [table for table in critical_tables if table in results and 'Error' in str(results[table])]
+            if failed_critical:
+                print(f"Warning: Critical tables failed to update: {failed_critical}")
+                
+        else:
+            print("Database has existing data - skipping initial sync from Airtable")
+        
+        # Set up StudentDataManager
+        student_data_manager = StudentDataManager(multi_manager)
 
 except Exception as e:
     print(f"Failed to initialize StudentDataManager: {e}")
