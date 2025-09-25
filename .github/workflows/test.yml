@@ -39,9 +39,44 @@ jobs:
           
     - name: Create test environment file
       run: |
-        echo "AIRTABLE_BASE_ID=${{ secrets.AIRTABLE_BASE_ID }}" >> .env.local
-        echo "AIRTABLE_API_KEY=${{ secrets.AIRTABLE_API_KEY }}" >> .env.local
+        # Use secrets if available, otherwise use test values
+        AIRTABLE_BASE_ID="${{ secrets.AIRTABLE_BASE_ID }}"
+        AIRTABLE_API_KEY="${{ secrets.AIRTABLE_API_KEY }}"
+        
+        if [ -z "$AIRTABLE_BASE_ID" ]; then
+          echo "WARNING: AIRTABLE_BASE_ID secret not configured, using test value"
+          AIRTABLE_BASE_ID="test_base_id"
+        fi
+        
+        if [ -z "$AIRTABLE_API_KEY" ]; then
+          echo "WARNING: AIRTABLE_API_KEY secret not configured, using test value"
+          AIRTABLE_API_KEY="test_api_key"
+        fi
+        
+        echo "AIRTABLE_BASE_ID=$AIRTABLE_BASE_ID" >> .env.local
+        echo "AIRTABLE_API_KEY=$AIRTABLE_API_KEY" >> .env.local
         echo "ENVIRONMENT_MODE=Development" >> .env.local
+        
+    - name: Debug environment variables
+      run: |
+        echo "=== Environment Variables Debug ==="
+        echo "System AIRTABLE_API_KEY: ${AIRTABLE_API_KEY:-'NOT SET'}"
+        echo "System AIRTABLE_BASE_ID: ${AIRTABLE_BASE_ID:-'NOT SET'}"
+        echo "System ENVIRONMENT_MODE: ${ENVIRONMENT_MODE:-'NOT SET'}"
+        echo ""
+        echo "=== .env.local file contents ==="
+        if [ -f .env.local ]; then
+          cat .env.local
+        else
+          echo ".env.local file not found"
+        fi
+        echo ""
+        echo "=== .env file contents ==="
+        if [ -f .env ]; then
+          cat .env
+        else
+          echo ".env file not found"
+        fi
         
     - name: Create data directory
       run: |
@@ -51,6 +86,25 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        
+    - name: Debug Python environment loading
+      run: |
+        python -c "
+        import os
+        print('=== Python Environment Debug ===')
+        print('os.getenv(AIRTABLE_API_KEY):', repr(os.getenv('AIRTABLE_API_KEY')))
+        print('os.getenv(AIRTABLE_BASE_ID):', repr(os.getenv('AIRTABLE_BASE_ID')))
+        print('os.getenv(ENVIRONMENT_MODE):', repr(os.getenv('ENVIRONMENT_MODE')))
+        print('')
+        try:
+            from utilities import load_env
+            print('Testing load_env function:')
+            print('ENVIRONMENT_MODE:', repr(load_env('ENVIRONMENT_MODE')))
+            print('AIRTABLE_BASE_ID:', repr(load_env('AIRTABLE_BASE_ID')))
+            print('AIRTABLE_API_KEY length:', len(load_env('AIRTABLE_API_KEY')) if load_env('AIRTABLE_API_KEY') else 'None')
+        except Exception as e:
+            print('load_env error:', str(e))
+        "
         
     - name: Validate Flask app startup
       run: |
@@ -92,9 +146,37 @@ jobs:
         
     - name: Create test environment file
       run: |
-        echo "AIRTABLE_BASE_ID=${{ secrets.AIRTABLE_BASE_ID }}" >> .env.local
-        echo "AIRTABLE_API_KEY=${{ secrets.AIRTABLE_API_KEY }}" >> .env.local
+        # Use secrets if available, otherwise use test values
+        AIRTABLE_BASE_ID="${{ secrets.AIRTABLE_BASE_ID }}"
+        AIRTABLE_API_KEY="${{ secrets.AIRTABLE_API_KEY }}"
+        
+        if [ -z "$AIRTABLE_BASE_ID" ]; then
+          echo "WARNING: AIRTABLE_BASE_ID secret not configured, using test value"
+          AIRTABLE_BASE_ID="test_base_id"
+        fi
+        
+        if [ -z "$AIRTABLE_API_KEY" ]; then
+          echo "WARNING: AIRTABLE_API_KEY secret not configured, using test value"
+          AIRTABLE_API_KEY="test_api_key"
+        fi
+        
+        echo "AIRTABLE_BASE_ID=$AIRTABLE_BASE_ID" >> .env.local
+        echo "AIRTABLE_API_KEY=$AIRTABLE_API_KEY" >> .env.local
         echo "ENVIRONMENT_MODE=Development" >> .env.local
+        
+    - name: Debug environment variables
+      run: |
+        echo "=== Environment Variables Debug ==="
+        echo "System AIRTABLE_API_KEY: ${AIRTABLE_API_KEY:-'NOT SET'}"
+        echo "System AIRTABLE_BASE_ID: ${AIRTABLE_BASE_ID:-'NOT SET'}"
+        echo "System ENVIRONMENT_MODE: ${ENVIRONMENT_MODE:-'NOT SET'}"
+        echo ""
+        echo "=== .env.local file contents ==="
+        if [ -f .env.local ]; then
+          cat .env.local
+        else
+          echo ".env.local file not found"
+        fi
         
     - name: Create data directory
       run: |
