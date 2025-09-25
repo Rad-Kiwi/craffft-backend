@@ -1634,8 +1634,12 @@ def run_all_tests():
     
     if failures == 0:
         print("All non-skipped tests passed!")
+        return 0  # Success exit code
     else:
         print(f"{failures} test(s) failed.")
+        return 1  # Failure exit code
 
 if __name__ == "__main__":
-    test_add_teacher_api()
+    import sys
+    exit_code = run_all_tests()
+    sys.exit(exit_code)
