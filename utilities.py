@@ -3,28 +3,65 @@ import json
 import datetime
 import decimal
 import ast
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
 critical_tables = ['craffft_students', 'craffft_teachers', 'craffft_quests']
 
 
 # Load environment variables once at module import time
 # Load .env first (defaults), then .env.local (overrides)
-load_dotenv('.env')
-load_dotenv('.env.local', override=True)
+# Use find_dotenv to gracefully handle missing files
+env_file = find_dotenv('.env')
+env_local_file = find_dotenv('.env.local')
 
-def load_env(KEY_NAME):
+if env_file:
+    load_dotenv(env_file)
+if env_local_file:
+    load_dotenv(env_local_file, override=True)
+
+def load_env(KEY_NAME, fallback=None, check_system=True):
     """
-    Load a value from environment variables.
-    .env contains default values, .env.local contains overrides.
-    Environment files are loaded once when this module is imported.
+    Load a value from environment variables with flexible source checking.
+    
+    Args:
+        KEY_NAME (str): The environment variable name to load
+        fallback (str, optional): Default value to return if variable is not found
+        check_system (bool): Whether to check system environment variables (always True with os.getenv)
+    
+    Priority order (os.getenv automatically checks all sources):
+    1. System environment variables (set by CI/CD, shell, etc.)
+    2. Variables loaded from .env.local file (overrides)
+    3. Variables loaded from .env file (defaults)
+    
+    Returns:
+        str: The environment variable value or fallback
+        
+    Raises:
+        ValueError: If the environment variable is not found and no fallback provided
     """
     value = os.getenv(KEY_NAME)
     
-    if not value:
-        raise ValueError(f"Environment variable '{KEY_NAME}' not found in .env or .env.local files.")
+    if value:
+        return value
     
-    return value
+    if fallback is not None:
+        return fallback
+    
+    # Build a helpful error message showing where we looked
+    env_file_status = "✓ loaded" if find_dotenv('.env') else "✗ not found"
+    env_local_status = "✓ loaded" if find_dotenv('.env.local') else "✗ not found" 
+    
+    error_msg = (
+        f"Environment variable '{KEY_NAME}' not found.\n"
+        f"Sources checked:\n"
+        f"  - System environment variables\n"
+        f"  - .env.local file ({env_local_status})\n"
+        f"  - .env file ({env_file_status})\n"
+        f"\nFor CI/CD: Ensure secrets are configured in GitHub Actions.\n"
+        f"For local development: Add '{KEY_NAME}=your_value' to .env.local file."
+    )
+    
+    raise ValueError(error_msg)
 
 
 def deep_jsonify(obj, max_depth=10, current_depth=0, parse_stringified_lists=True):

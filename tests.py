@@ -1692,4 +1692,6 @@ def run_all_tests():
         return 1  # Failure exit code
 
 if __name__ == "__main__":
-    test_add_teacher_api()
+    import sys
+    exit_code = run_all_tests()
+    sys.exit(exit_code)
