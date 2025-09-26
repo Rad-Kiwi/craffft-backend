@@ -970,18 +970,27 @@ def test_get_step_data_api():
         return "SKIPPED"
     
     # Get sample step data for testing
-    all_steps_data = steps_manager.get_table_as_json()
+    all_steps_data = steps_manager.get_full_table()
 
     if not all_steps_data or len(all_steps_data) == 0:
         print("SKIP: test_get_step_data_api - No steps data found")
         return "SKIPPED"
     
-    # Use first step for specific step testing
-    test_step = all_steps_data[1]
-    test_step_name = test_step.get('name', '')
+    # Find a step with an actual name (some steps have empty names like in-game steps)
+    test_step = None
+    test_step_name = ""
     
-    if not test_step_name:
-        print("SKIP: test_get_step_data_api - First step has no name field")
+    for step in all_steps_data:
+        if isinstance(step, dict):
+            # Check various possible field names for the step name
+            step_name = step.get('name', '') or step.get('step_name', '') or step.get('title', '')
+            if step_name and step_name.strip():  # Found a step with a non-empty name
+                test_step = step
+                test_step_name = step_name.strip()
+                break
+    
+    if not test_step or not test_step_name:
+        print("SKIP: test_get_step_data_api - No steps found with valid names")
         return "SKIPPED"
     
     print(f"Using test step: '{test_step_name}'")
