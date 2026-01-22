@@ -77,7 +77,7 @@ def deep_jsonify_response(obj):
 def home():
     return """
     <h1>Craffft Backend - Up and running!</h1>
-    <p><a href="https://github.com/radkiwi/craffft-backend">View all routes on GitHub</a></p>
+    <p><a href="https://github.com/rad-kiwi/craffft-backend?tab=readme-ov-file#craffft-backend">View all documentation and routes on Github</a></p>
     <h2>API Documentation:</h2>
     <ul>
         <li><a href="/docs/">📚 Interactive API Documentation (Swagger)</a> - Test all endpoints with live examples</li>
